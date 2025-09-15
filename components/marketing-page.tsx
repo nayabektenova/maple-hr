@@ -7,7 +7,7 @@ export default function MarketingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white text-gray-800">
-      {/* Welcome Section */}
+      
       <section className="text-center py-20 px-6 bg-green-600 text-white">
         <h1 className="text-5xl font-extrabold mb-4">Welcome to Maple HR</h1>
         <p className="text-xl max-w-3xl mx-auto">
@@ -16,7 +16,7 @@ export default function MarketingPage() {
         </p>
       </section>
 
-      {/* What is Maple HR */}
+      
       <section className="py-16 px-6 max-w-5xl mx-auto">
         <h2 className="text-3xl font-bold text-green-700 mb-4">What is Maple HR?</h2>
         <p className="text-lg leading-relaxed">
@@ -28,7 +28,6 @@ export default function MarketingPage() {
         </p>
       </section>
 
-      {/* Problem Statement */}
       <section className="py-16 px-6 max-w-5xl mx-auto bg-green-50 rounded-2xl shadow-md">
         <h2 className="text-3xl font-bold text-green-700 mb-4">The Problem</h2>
         <p className="text-lg leading-relaxed">
@@ -41,7 +40,7 @@ export default function MarketingPage() {
         </p>
       </section>
 
-      {/* Our Solution */}
+      
       <section className="py-16 px-6 max-w-5xl mx-auto">
         <h2 className="text-3xl font-bold text-green-700 mb-4">
           What Problems Are We Solving?
@@ -56,7 +55,7 @@ export default function MarketingPage() {
         </p>
       </section>
 
-      {/* Call to Action */}
+      
       <section className="py-20 text-center bg-green-600 text-white">
         <h2 className="text-3xl font-bold mb-6">Looks Interesting?</h2>
         <button

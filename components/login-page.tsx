@@ -18,7 +18,7 @@ export default function LoginPageComponent() {
       
       <div className="absolute inset-0 -z-10">
         <Image
-          src="/public/login.png" 
+          src="/login-background.png" 
           alt="Background"
           fill
           className="object-cover"
@@ -28,7 +28,7 @@ export default function LoginPageComponent() {
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <div className="flex items-center justify-center mb-6">
           <Image
-            src="/public/logo.png" 
+            src="/logo.png" 
             alt="MapleHR Logo"
             width={40}
             height={40}
@@ -43,7 +43,7 @@ export default function LoginPageComponent() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
               placeholder="Enter your username"
               required
             />
@@ -55,7 +55,7 @@ export default function LoginPageComponent() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
               placeholder="Enter your password"
               required
             />
