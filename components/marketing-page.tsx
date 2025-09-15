@@ -63,7 +63,7 @@ export default function MarketingPage() {
           onClick={() => router.push("/login")}
           className="px-8 py-4 bg-white text-green-700 font-semibold rounded-lg shadow-md hover:bg-green-100 transition"
         >
-          🌟 Try Free
+          Try Free
         </button>
         <p className="mt-8 text-lg">
           Already have an account?{" "}

@@ -18,7 +18,7 @@ export default function LoginPageComponent() {
       
       <div className="absolute inset-0 -z-10">
         <Image
-          src="/bg-login.png" 
+          src="/public/login.png" 
           alt="Background"
           fill
           className="object-cover"
@@ -28,7 +28,7 @@ export default function LoginPageComponent() {
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <div className="flex items-center justify-center mb-6">
           <Image
-            src="/logo.png" 
+            src="/public/logo.png" 
             alt="MapleHR Logo"
             width={40}
             height={40}
