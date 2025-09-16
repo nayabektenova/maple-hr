@@ -116,24 +116,24 @@ export function EmployeeList() {
         </div>
       </div>
 
-      <Table>
+      <Table className="min-w-full table-fixed">
         <TableHeader>
-          <TableRow>
+          <TableRow className="pointer-events:none;">
             <TableHead className="w-12"></TableHead>
-            <TableHead>First Name</TableHead>
-            <TableHead>Last Name</TableHead>
-            <TableHead>ID</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Phone number</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead>Position</TableHead>
+            <TableHead className="w-36">First Name</TableHead>
+            <TableHead className="w-36">Last Name</TableHead>
+            <TableHead className="w-32">ID</TableHead>
+            <TableHead className="w-64">Email</TableHead>
+            <TableHead className="w-40">Phone number</TableHead>
+            <TableHead className="w-40">Department</TableHead>
+            <TableHead className="w-48">Position</TableHead>
             <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredEmployees.map((emp, i) => (
             <TableRow key={i} className="hover:bg-gray-50">
-              <TableCell>
+              <TableCell className="w-12">
                 {emp.firstName === "Harry" && emp.lastName === "Styles" ? (
                   <Link href={`/employees/${emp.id}`}>
                     <Button variant="ghost" size="sm">
@@ -146,13 +146,14 @@ export function EmployeeList() {
                   </Button>
                 )}
               </TableCell>
-              <TableCell className="font-medium">{emp.firstName}</TableCell>
-              <TableCell>{emp.lastName}</TableCell>
-              <TableCell className="text-gray-600">{emp.id}</TableCell>
-              <TableCell className="text-gray-600">{emp.email}</TableCell>
-              <TableCell className="text-gray-600">{emp.phone}</TableCell>
-              <TableCell className="text-gray-600">{emp.department}</TableCell>
-              <TableCell className="text-gray-600">{emp.position}</TableCell>
+              <TableCell className="font-medium w-36">{emp.firstName}</TableCell>
+              <TableCell className="w-36">{emp.lastName}</TableCell>
+              <TableCell className="text-gray-600 w-32">{emp.id}</TableCell>
+              <TableCell className="text-gray-600 w-64">{emp.email}</TableCell>
+              <TableCell className="text-gray-600 w-40">{emp.phone}</TableCell>
+              <TableCell className="text-gray-600 w-40">{emp.department}</TableCell>
+              <TableCell className="text-gray-600 w-48">{emp.position}</TableCell>
+              <TableCell className="w-12"></TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -24,7 +24,7 @@ const sampleEmployeeData = {
   passportNumber: "12345678",
   dateOfBirth: "1994-02-01",
   placeOfBirth: "UK",
-  materialStatus: "Single",
+  maritalStatus: "Single",
   emergencyContact: "+1 234 56789",
   nationality: "UK",
   position: "Manager",
@@ -48,7 +48,7 @@ export function EmployeeInformation({ employeeId }: EmployeeInformationProps) {
     passportNumber: "",
     dateOfBirth: "",
     placeOfBirth: "",
-    materialStatus: "",
+    maritalStatus: "",
     emergencyContact: "",
     nationality: "",
     position: "",
@@ -153,12 +153,12 @@ export function EmployeeInformation({ employeeId }: EmployeeInformationProps) {
                   <Input id="gender" value={employeeData.gender} readOnly className="w-full bg-gray-50" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="materialStatus" className="text-sm font-medium">
-                    Material status
+                  <Label htmlFor="maritalStatus" className="text-sm font-medium">
+                    Marital status
                   </Label>
                   <Input
-                    id="materialStatus"
-                    value={employeeData.materialStatus}
+                    id="maritalStatus"
+                    value={employeeData.maritalStatus}
                     readOnly
                     className="w-full bg-gray-50"
                   />

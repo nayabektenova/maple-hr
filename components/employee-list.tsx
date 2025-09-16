@@ -123,7 +123,7 @@ export function EmployeeList() {
         </div>
       </div>
 
-      <Table>
+      <Table className="min-w-full table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-12"></TableHead>
@@ -160,6 +160,7 @@ export function EmployeeList() {
               <TableCell className="text-gray-600">{emp.phone}</TableCell>
               <TableCell className="text-gray-600">{emp.department}</TableCell>
               <TableCell className="text-gray-600">{emp.position}</TableCell>
+              <TableCell className="w-12"></TableCell>
             </TableRow>
           ))}
         </TableBody>
