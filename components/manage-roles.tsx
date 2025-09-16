@@ -130,7 +130,7 @@ export default function ManageRoles() {
           </div>
           <Separator />
           <ScrollArea className="h-[480px]">
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               {filtered.map(e => {
                 const asg = assign.find(a => a.employeeId === e.id);
                 const role = roles.find(r => r.id === asg?.roleId);
