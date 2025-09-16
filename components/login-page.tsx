@@ -65,7 +65,7 @@ export default function LoginPageComponent() {
             type="submit"
             className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
           >
-            Create account
+            Login
           </button>
         </form>
 
