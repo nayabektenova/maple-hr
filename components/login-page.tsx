@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function LoginPageComponent() {
@@ -65,9 +66,16 @@ export default function LoginPageComponent() {
             type="submit"
             className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
           >
-            Create account
+            Login
           </button>
         </form>
+
+        <p className="text-sm text-gray-500 text-center mt-4">
+          Trying for the first time?{" "}
+          <Link href="/register" className="text-green-600 hover:underline">
+            Register here
+          </Link>
+        </p>
 
         <p className="text-xs text-gray-500 text-center mt-6">
           By creating an account you agree to our{" "}
