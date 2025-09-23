@@ -1,13 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function MarketingPage() {
   const router = useRouter();
 
+  const industries = [
+    { name: "Technology", image: "/technology.jpg" },
+    { name: "Healthcare", image: "/healthcare.jpeg" },
+    { name: "Education", image: "/education.jpg" },
+    { name: "Finance", image: "/finance.jpg" },
+    { name: "Retail", image: "/retail.jpeg" },
+    { name: "Construction", image: "/construction.jpg" },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white text-gray-800">
-      
       <section className="text-center py-16 px-6">
         <h1 className="text-5xl font-extrabold text-green-700 mb-4">
           Welcome to Maple HR
@@ -18,7 +27,38 @@ export default function MarketingPage() {
         </p>
       </section>
 
-      {/* these are the Section for my main maple hr text */}
+      {/* NEW SECTION: Industries */}
+      <section className="py-16 px-6 max-w-6xl mx-auto">
+        <h2 className="text-3xl font-bold text-green-700 text-center mb-10">
+          MapleHR is here for
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          {industries.map((industry, idx) => (
+            <div
+              key={idx}
+              onClick={() => router.push("/login")}
+              className="bg-white rounded-2xl shadow-md p-6 flex flex-col justify-between items-center hover:scale-105 transition-transform cursor-pointer"
+            >
+              <h3 className="text-xl font-bold text-green-700 mb-4">
+                {industry.name}
+              </h3>
+
+              {/* Image container */}
+              <div className="w-full h-40 flex items-center justify-center">
+                <Image
+                  src={industry.image}
+                  alt={industry.name}
+                  width={300}
+                  height={300}
+                  className="object-contain max-h-full"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* EXISTING MAIN MAPLE HR SECTIONS */}
       <section className="py-16 px-6 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Section 1 */}
         <div className="bg-white rounded-2xl shadow-md p-6 hover:scale-105 transition-transform cursor-pointer">
@@ -27,25 +67,25 @@ export default function MarketingPage() {
           </h2>
           <p className="text-lg leading-relaxed">
             Canadian-based HR Management System, a web platform designed to
-            streamline, centralize, and automate essential HR functions for small
-            to mid-sized organizations. The system provides secure, scalable, and
-            user-friendly solutions to support both administrative workflows and
-            employee self-service needs.
+            streamline, centralize, and automate essential HR functions for
+            small to mid-sized organizations. The system provides secure,
+            scalable, and user-friendly solutions to support both administrative
+            workflows and employee self-service needs.
           </p>
         </div>
 
-        {/* section 2 */}
+        {/* Section 2 */}
         <div className="bg-white rounded-2xl shadow-md p-6 hover:scale-105 transition-transform cursor-pointer">
           <h2 className="text-2xl font-bold text-green-700 mb-4">
             The Problem
           </h2>
           <p className="text-lg leading-relaxed">
             Small and mid-sized Canadian organizations face significant
-            challenges in managing HR tasks due to reliance on fragmented systems
-            like spreadsheets, paper forms, and disconnected applications. This
-            leads to inefficiencies, payroll mistakes, and difficulties during
-            audits. HR teams spend too much time on manual data correction instead
-            of focusing on strategic initiatives.
+            challenges in managing HR tasks due to reliance on fragmented
+            systems like spreadsheets, paper forms, and disconnected
+            applications. This leads to inefficiencies, payroll mistakes, and
+            difficulties during audits. HR teams spend too much time on manual
+            data correction instead of focusing on strategic initiatives.
           </p>
         </div>
 
@@ -66,7 +106,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      
+      {/* CTA Section */}
       <section className="py-20 text-center">
         <h2 className="text-3xl font-bold text-green-700 mb-6">
           Looks Interesting?
