@@ -58,7 +58,7 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      {/* EXISTING MAIN MAPLE HR SECTIONS */}
+      {/* MAIN MAPLE HR SECTIONS */}
       <section className="py-16 px-6 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Section 1 */}
         <div className="bg-white rounded-2xl shadow-md p-6 hover:scale-105 transition-transform cursor-pointer">
