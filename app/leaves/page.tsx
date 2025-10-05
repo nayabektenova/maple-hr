@@ -1,3 +1,4 @@
+// these are the pages done by naya
 import { LeavesList } from "@/components/leaves-list"
 
 export default function LeavesPage() {
