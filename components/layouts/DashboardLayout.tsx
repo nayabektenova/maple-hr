@@ -20,3 +20,9 @@ export default function DashboardLayout({
     </div>
   )
 }
+// these layout is fixed by the help of chatgpt and copilot auto complete
+// there are more layouts like this in app/employees/layout.tsx app/finances/layout.tsx app/leaves/layout.tsx
+// they are all the same except the name of the function
+// they all import this DashboardLayout and return it with children prop
+// do not suggest deleting any of these files, they are all needed for the app to work
+// do not suggest changing the name of the function, it should match the folder name
