@@ -1,13 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-// these are the code done by naya benkotava
+import { supabase } from "@/lib/supabaseClient"
+
 // ---- Types ----
 type WorkLocation = "On-site" | "Remote"
 type DayStatus =
@@ -19,34 +20,13 @@ type Employee = { id: string; firstName: string; lastName: string; department: s
 type Weekday = "Mon" | "Tue" | "Wed" | "Thu" | "Fri"
 type WeekSchedule = Record<string, Record<Weekday, DayStatus>>
 
-// ---- Data (example) ----
-const employees: Employee[] = [
-  { id: "1", firstName: "Saul", lastName: "Mullins", department: "Development" },
-  { id: "2", firstName: "Amirah", lastName: "Vincent", department: "Development" },
-  { id: "3", firstName: "Morgan", lastName: "Terrell", department: "Development" },
-  { id: "4", firstName: "Henrietta", lastName: "Gibbs", department: "Marketing" },
-  { id: "5", firstName: "Enzo", lastName: "Cobb", department: "Development" },
-  { id: "6", firstName: "Fintan", lastName: "Huff", department: "Development" },
-  { id: "7", firstName: "Lena", lastName: "Dixon", department: "Finance" },
-  { id: "8", firstName: "Cole", lastName: "Stanton", department: "Development" },
-]
+// fallback / empty while loading
+const emptySchedule: WeekSchedule = {}
 
-const initialSchedule: WeekSchedule = {
-  "1": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Wed:{kind:"off"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "2": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Wed:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "3": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Wed:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "4": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Wed:{kind:"off"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "5": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Wed:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "6": { Mon:{kind:"vacation"}, Tue:{kind:"vacation"}, Wed:{kind:"vacation"}, Thu:{kind:"vacation"}, Fri:{kind:"vacation"} },
-  "7": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"Remote"}, Wed:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-  "8": { Mon:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Tue:{kind:"off"}, Wed:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Thu:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"}, Fri:{kind:"shift",start:"8:00 AM",end:"5:00 PM",location:"On-site"} },
-}
-
-const departments = Array.from(new Set(employees.map(e => e.department)))
+// these helpers are identical to your original ones
 const locations: WorkLocation[] = ["On-site", "Remote"]
 const weekdays: Weekday[] = ["Mon","Tue","Wed","Thu","Fri"]
 
-// ---- Helpers (same style as employee list) ----
 const CustomSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <div className="relative inline-block">
     <select {...props} className="px-3 py-2 pr-8 border border-gray-300 rounded-md text-sm appearance-none" />
@@ -80,7 +60,6 @@ function ReadonlyShift({ day }: { day: DayStatus }) {
   return null
 }
 
-// Edit cell with inline controls
 function EditableShift({
   value,
   onChange,
@@ -92,7 +71,6 @@ function EditableShift({
 
   return (
     <div className="py-3">
-      {/* Kind selector */}
       <div className="mb-2">
         <select
           value={kind}
@@ -152,18 +130,98 @@ function EditableShift({
 }
 
 export function ScheduleList() {
-  // —— SAME header controls / spacing as employee list ——
+  // UI state (same as before)
   const [searchTerm, setSearchTerm] = useState("")
   const [alphaSort, setAlphaSort] = useState(false)
-  const [departmentFilter, setDepartmentFilter] = useState(departments[0] ?? "")
+  const [departmentFilter, setDepartmentFilter] = useState("")
   const [locationFilter, setLocationFilter] = useState<"" | WorkLocation>("")
 
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()))
   const [published, setPublished] = useState<boolean>(true)
 
-  // NEW: edit mode + schedule state
+  // edit + schedule state now come from Supabase
   const [editMode, setEditMode] = useState<boolean>(false)
-  const [scheduleState, setScheduleState] = useState<WeekSchedule>(() => JSON.parse(JSON.stringify(initialSchedule)))
+  const [scheduleState, setScheduleState] = useState<WeekSchedule>(emptySchedule)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+
+  // derived lists
+  const departments = Array.from(new Set(employees.map(e => e.department)))
+
+  // Fetch employees and schedules from Supabase on mount
+  useEffect(() => {
+    let mounted = true
+
+    async function loadData() {
+      setLoading(true)
+      // fetch employees
+      const { data: empData, error: empErr } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, department')
+
+      if (empErr) {
+        console.error('Error fetching employees:', empErr)
+      } else if (empData && mounted) {
+        const mapped: Employee[] = empData.map((r: any) => ({
+          id: r.id,
+          firstName: r.first_name,
+          lastName: r.last_name,
+          department: r.department
+        }))
+        setEmployees(mapped)
+      }
+
+      // fetch schedules
+      const { data: schedData, error: schedErr } = await supabase
+        .from('schedules')
+        .select('employee_id, weekday, kind, start_time, end_time, location')
+
+      if (schedErr) {
+        console.error('Error fetching schedules:', schedErr)
+      } else if (schedData && mounted) {
+        const ws: WeekSchedule = {};
+        // initialize with off by default for employees we know (will fill in after)
+        (empData ?? []).forEach((e: any) => {
+          ws[e.id] = {
+            Mon: { kind: "off" },
+            Tue: { kind: "off" },
+            Wed: { kind: "off" },
+            Thu: { kind: "off" },
+            Fri: { kind: "off" },
+          }
+        })
+
+        // apply schedule rows
+        schedData.forEach((row: any) => {
+          const empId = row.employee_id
+          const wd = row.weekday as Weekday
+          if (!ws[empId]) {
+            ws[empId] = { Mon: { kind: "off" }, Tue: { kind: "off" }, Wed: { kind: "off" }, Thu: { kind: "off" }, Fri: { kind: "off" } }
+          }
+
+          if (row.kind === 'shift') {
+            ws[empId][wd] = {
+              kind: 'shift',
+              start: row.start_time ?? '8:00 AM',
+              end: row.end_time ?? '5:00 PM',
+              location: (row.location as WorkLocation) ?? 'On-site'
+            }
+          } else if (row.kind === 'off') {
+            ws[empId][wd] = { kind: 'off' }
+          } else if (row.kind === 'vacation') {
+            ws[empId][wd] = { kind: 'vacation' }
+          }
+        })
+
+        setScheduleState(ws)
+      }
+
+      setLoading(false)
+    }
+
+    loadData()
+    return () => { mounted = false }
+  }, [])
 
   const filtered = useMemo(() => {
     let rows = employees.filter((e) =>
@@ -183,7 +241,7 @@ export function ScheduleList() {
     }
 
     return rows
-  }, [searchTerm, departmentFilter, alphaSort, locationFilter, scheduleState])
+  }, [searchTerm, departmentFilter, alphaSort, locationFilter, scheduleState, employees])
 
   const changeWeek = (dir: "prev" | "next") => {
     const d = new Date(weekStart)
@@ -201,23 +259,106 @@ export function ScheduleList() {
     }))
   }
 
-  const handlePrimaryAction = () => {
+  // Save: upsert all changed schedule rows into Supabase
+  const handlePrimaryAction = async () => {
     if (editMode) {
-      // “Save” — you could persist to API here.
-      setEditMode(false)
+      // Save -> upsert changed scheduleState to supabase
+      try {
+        // build rows in the shape supabase expects
+        const rowsToUpsert: any[] = []
+        for (const empId of Object.keys(scheduleState)) {
+          const empDays = scheduleState[empId]
+          for (const wd of Object.keys(empDays) as Weekday[]) {
+            const day = empDays[wd]
+            if (day.kind === 'shift') {
+              rowsToUpsert.push({
+                employee_id: empId,
+                weekday: wd,
+                kind: 'shift',
+                start_time: day.start,
+                end_time: day.end,
+                location: day.location
+              })
+            } else {
+              rowsToUpsert.push({
+                employee_id: empId,
+                weekday: wd,
+                kind: day.kind
+              })
+            }
+          }
+        }
+
+        // upsert in batches (Supabase has payload limits — usually fine for small tables)
+        const { data, error } = await supabase
+          .from('schedules')
+          .upsert(rowsToUpsert, { onConflict: 'employee_id,weekday' })
+
+        if (error) {
+          console.error('Upsert schedules error:', error)
+          alert('Error saving schedules. See console for details.')
+        } else {
+          // optionally refresh from DB to ensure canonical data
+          const { data: refreshed } = await supabase
+            .from('schedules')
+            .select('employee_id, weekday, kind, start_time, end_time, location')
+
+          if (refreshed) {
+            // rebuild state from refreshed rows (same logic as load)
+            const ws: WeekSchedule = {};
+            (employees ?? []).forEach((e) => {
+              ws[e.id] = {
+                Mon: { kind: "off" },
+                Tue: { kind: "off" },
+                Wed: { kind: "off" },
+                Thu: { kind: "off" },
+                Fri: { kind: "off" },
+              }
+            })
+            refreshed.forEach((row: any) => {
+              const empId = row.employee_id
+              const wd = row.weekday as Weekday
+              if (!ws[empId]) ws[empId] = { Mon: { kind: "off" }, Tue: { kind: "off" }, Wed: { kind: "off" }, Thu: { kind: "off" }, Fri: { kind: "off" } }
+
+              if (row.kind === 'shift') {
+                ws[empId][wd] = {
+                  kind: 'shift',
+                  start: row.start_time ?? '8:00 AM',
+                  end: row.end_time ?? '5:00 PM',
+                  location: (row.location as WorkLocation) ?? 'On-site'
+                }
+              } else if (row.kind === 'off') {
+                ws[empId][wd] = { kind: 'off' }
+              } else if (row.kind === 'vacation') {
+                ws[empId][wd] = { kind: 'vacation' }
+              }
+            })
+            setScheduleState(ws)
+          }
+          setEditMode(false)
+        }
+      } catch (err) {
+        console.error('save error', err)
+        alert('Unexpected error saving schedules')
+      }
     } else {
-      // “Edit shift”
       setEditMode(true)
     }
   }
 
+  // Show loader or empty state if data still loading
+  if (loading) {
+    return <div className="bg-white rounded-lg border border-gray-200 p-6">Loading schedule...</div>
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* --------- HEADER (identical layout to employee-list) --------- */}
+      {/* --------- HEADER (identical layout to employee list) --------- */}
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         {/* Row 1 */}
         <div className="flex items-center gap-4">
           <CustomSelect value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
+            <option value="">All Departments</option>
             {departments.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
