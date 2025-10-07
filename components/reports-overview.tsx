@@ -1,9 +1,8 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Calendar as CalendarIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   ResponsiveContainer,
   PieChart,
@@ -15,40 +14,45 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-} from "recharts"
+} from "recharts";
+import { supabase } from "@/lib/supabaseClient";
 
-// ----- Demo data -----
-const employmentTypes = [
-  { name: "Full-time / Permanent", value: 34 },
-  { name: "Remote / Hybrid", value: 17 },
-  { name: "Contract / Freelance", value: 13 },
-  { name: "Part-time", value: 17 },
-  { name: "Internship", value: 9 },
-  { name: "Temporary / Agency", value: 10 },
-]
+// Map raw `current_contract` values from DB to display buckets.
+// Add/adjust keys on the left to match your actual strings in the table.
+const CONTRACT_BUCKETS: Record<string, string> = {
+  // Full-time / Permanent
+  "full-time": "Full-time / Permanent",
+  "full_time": "Full-time / Permanent",
+  "permanent": "Full-time / Permanent",
+  "fte": "Full-time / Permanent",
 
-const availability = [
-  { name: "Present On-Site", value: 40 },
-  { name: "Working remotely", value: 35 },
-  { name: "On leave", value: 10 },
-  { name: "Absent (Unplanned)", value: 5 },
-  { name: "On training / Travel", value: 5 },
-  { name: "Holidays / Weekends", value: 5 },
-]
+  // Remote / Hybrid (keep here IF your data stores it in current_contract)
+  "remote": "Remote / Hybrid",
+  "hybrid": "Remote / Hybrid",
+  "wfh": "Remote / Hybrid",
 
-const byDepartment = [
-  { name: "Cybersecurity", employees: 23 },
-  { name: "Development", employees: 28 },
-  { name: "Marketing", employees: 17 },
-  { name: "Administration", employees: 26 },
-  { name: "Finance", employees: 23 },
-  { name: "Maintenance", employees: 26 },
-  { name: "Customer Support", employees: 26 },
-  { name: "Design", employees: 24 },
-]
+  // Contract / Freelance
+  "contract": "Contract / Freelance",
+  "freelance": "Contract / Freelance",
+  "contractor": "Contract / Freelance",
 
-// subtle pleasant palette
-const PIE_COLORS = ["#34d399", "#a78bfa", "#f59e0b", "#60a5fa", "#f97316", "#86efac"]
+  // Part-time
+  "part-time": "Part-time",
+  "part_time": "Part-time",
+  "pt": "Part-time",
+
+  // Internship
+  "intern": "Internship",
+  "internship": "Internship",
+
+  // Temporary / Agency
+  "temporary": "Temporary / Agency",
+  "temp": "Temporary / Agency",
+  "agency": "Temporary / Agency",
+};
+
+// palette 
+const PIE_COLORS = ["#34d399", "#a78bfa", "#f59e0b", "#60a5fa", "#f97316", "#86efac"];
 
 function SectionCard({
   title,
@@ -56,32 +60,21 @@ function SectionCard({
   rightLabel,
   className,
 }: {
-  title: string
-  children: React.ReactNode
-  rightLabel?: string
-  className?: string
+  title: string;
+  children: React.ReactNode;
+  rightLabel?: string;
+  className?: string;
 }) {
-  const [month, setMonth] = useState(rightLabel ?? "July 2025")
+  const [month, setMonth] = useState(rightLabel ?? "July 2025");
   return (
     <div className={cn("bg-white rounded-xl border border-gray-200 p-4 sm:p-6", className)}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        {rightLabel !== undefined && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-gray-700 hover:bg-gray-50"
-            onClick={() => setMonth((m) => (m === "July 2025" ? "June 2025" : "July 2025"))}
-            title="Toggle month"
-          >
-            <CalendarIcon className="w-4 h-4 mr-2" />
-            {month}
-          </Button>
-        )}
+        
       </div>
       {children}
     </div>
-  )
+  );
 }
 
 function LegendList({ items }: { items: { name: string; color: string }[] }) {
@@ -94,20 +87,114 @@ function LegendList({ items }: { items: { name: string; color: string }[] }) {
         </li>
       ))}
     </ul>
-  )
+  );
 }
 
+type EmployeeRow = {
+  id: string;
+  department: string | null;
+  current_contract: string | null; 
+};
+
 export function ReportsOverview() {
-  const [activeTab] = useState<"overview">("overview") // placeholder in case you add more tabs later
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [rows, setRows] = useState<EmployeeRow[]>([]);
+
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, department, current_contract");
+
+      if (!ok) return;
+
+      if (error) {
+        setErr(error.message);
+        setRows([]);
+      } else {
+        setRows((data as EmployeeRow[]) || []);
+      }
+      setLoading(false);
+    })();
+
+    return () => {
+      ok = false;
+    };
+  }, []);
+
+  const norm = (v?: string | null) => (v ?? "").toString().trim().toLowerCase();
+
+  // Employment Types (from current_contract)
+  const employmentTypes = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of rows) {
+      const key = CONTRACT_BUCKETS[norm(r.current_contract)] ?? "Other";
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    const order = [
+      "Full-time / Permanent",
+      "Remote / Hybrid",
+      "Contract / Freelance",
+      "Part-time",
+      "Internship",
+      "Temporary / Agency",
+      "Other",
+    ];
+    return order
+      .filter((k) => counts[k] > 0)
+      .map((k) => ({ name: k, value: counts[k] }));
+  }, [rows]);
+
+  // Employees by Department
+  const byDepartment = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of rows) {
+      const dept = (r.department ?? "Unassigned").trim() || "Unassigned";
+      counts[dept] = (counts[dept] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([name, employees]) => ({ name, employees }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-48 bg-gray-100 rounded" />
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="h-80 bg-gray-100 rounded-xl" />
+          <div className="h-80 bg-gray-100 rounded-xl" />
+        </div>
+        <div className="h-96 bg-gray-100 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (err) {
+    return (
+      <div className="p-4 border rounded-xl bg-red-50 text-red-700">
+        Failed to load reports: {err}
+      </div>
+    );
+  }
+
+  const noEmployees = rows.length === 0;
+
+  // Totals for % tooltips
+  const totalEmp = employmentTypes.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="space-y-6">
-      {/* Top pills (Overview active; Leave present but disabled to match screenshot while keeping only Overview page) */}
-      
-
-      {/* Row of 2 pie charts */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <SectionCard title="Employment Types" rightLabel="July 2025">
+      {/* Employment Types (from current_contract) */}
+      <SectionCard title="Employment Types" rightLabel="July 2025">
+        {noEmployees ? (
+          <div className="text-sm text-gray-500">No employees found.</div>
+        ) : (
           <div className="grid md:grid-cols-2 gap-6 items-center">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -120,74 +207,56 @@ export function ReportsOverview() {
                     outerRadius={80}
                     paddingAngle={3}
                   >
-                    {employmentTypes.map((entry, idx) => (
+                    {employmentTypes.map((_, idx) => (
                       <Cell key={`cell-et-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <ReTooltip formatter={(v: number) => `${v}%`} />
+                  <ReTooltip
+                    formatter={(val: number, _n: string, entry: any) => {
+                      const pct = totalEmp ? ((val / totalEmp) * 100).toFixed(1) + "%" : "—";
+                      return [`${val} (${pct})`, entry?.name];
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <LegendList
-              items={employmentTypes.map((d, i) => ({ name: d.name, color: PIE_COLORS[i % PIE_COLORS.length] }))}
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Workforce Availability" rightLabel="July 2025">
-          <div className="grid md:grid-cols-2 gap-6 items-center">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={availability}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                  >
-                    {availability.map((entry, idx) => (
-                      <Cell key={`cell-av-${idx}`} fill={PIE_COLORS[(idx + 1) % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ReTooltip formatter={(v: number) => `${v}%`} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <LegendList
-              items={availability.map((d, i) => ({
+              items={employmentTypes.map((d, i) => ({
                 name: d.name,
-                color: PIE_COLORS[(i + 1) % PIE_COLORS.length],
+                color: PIE_COLORS[i % PIE_COLORS.length],
               }))}
             />
           </div>
-        </SectionCard>
-      </div>
+        )}
+      </SectionCard>
 
-      {/* Bar chart */}
+      {/* Employees by Department */}
       <SectionCard title="Employees by Department">
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={byDepartment} barCategoryGap={24}>
-              <CartesianGrid vertical={false} stroke="#e5e7eb" />
-              <XAxis
-                dataKey="name"
-                tickMargin={8}
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={{ stroke: "#e5e7eb" }}
-              />
-              <YAxis
-                tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={{ stroke: "#e5e7eb" }}
-                tickLine={{ stroke: "#e5e7eb" }}
-              />
-              <ReTooltip />
-              <Bar dataKey="employees" radius={[6, 6, 0, 0]} fill="#34d399" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {noEmployees ? (
+          <div className="text-sm text-gray-500">No employees found.</div>
+        ) : (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byDepartment} barCategoryGap={24}>
+                <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                <XAxis
+                  dataKey="name"
+                  tickMargin={8}
+                  tick={{ fill: "#6b7280", fontSize: 12 }}
+                  axisLine={{ stroke: "#e5e7eb" }}
+                />
+                <YAxis
+                  tick={{ fill: "#6b7280", fontSize: 12 }}
+                  axisLine={{ stroke: "#e5e7eb" }}
+                  tickLine={{ stroke: "#e5e7eb" }}
+                />
+                <ReTooltip />
+                <Bar dataKey="employees" radius={[6, 6, 0, 0]} fill="#34d399" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </SectionCard>
     </div>
-  )
+  );
 }
