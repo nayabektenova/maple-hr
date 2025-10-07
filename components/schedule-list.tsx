@@ -1,5 +1,5 @@
 "use client"
-
+// copilot saved from previous version, now with Supabase integration
 import { useMemo, useState, useEffect } from "react"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, MoreHorizontal, Search } from "lucide-react"
@@ -23,7 +23,7 @@ type WeekSchedule = Record<string, Record<Weekday, DayStatus>>
 // fallback / empty while loading
 const emptySchedule: WeekSchedule = {}
 
-// these helpers are identical to your original ones
+// these helpers are identical to  original ones
 const locations: WorkLocation[] = ["On-site", "Remote"]
 const weekdays: Weekday[] = ["Mon","Tue","Wed","Thu","Fri"]
 
