@@ -18,7 +18,6 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 
 // Map raw `current_contract` values from DB to display buckets.
-// Add/adjust keys on the left to match your actual strings in the table.
 const CONTRACT_BUCKETS: Record<string, string> = {
   // Full-time / Permanent
   "full-time": "Full-time / Permanent",
@@ -26,7 +25,7 @@ const CONTRACT_BUCKETS: Record<string, string> = {
   "permanent": "Full-time / Permanent",
   "fte": "Full-time / Permanent",
 
-  // Remote / Hybrid (keep here IF your data stores it in current_contract)
+  // Remote / Hybrid (if your data stores it in current_contract)
   "remote": "Remote / Hybrid",
   "hybrid": "Remote / Hybrid",
   "wfh": "Remote / Hybrid",
@@ -51,8 +50,62 @@ const CONTRACT_BUCKETS: Record<string, string> = {
   "agency": "Temporary / Agency",
 };
 
-// palette 
-const PIE_COLORS = ["#34d399", "#a78bfa", "#f59e0b", "#60a5fa", "#f97316", "#86efac"];
+// palette
+const PIE_COLORS = ["#34d399", "#a78bfa", "#f59e0b", "#60a5fa", "#f97316", "#86efac", "#ef4444", "#10b981"];
+
+// ==== ADDED: Leaves helpers/types (kept in this file, no extra pages/files) ====
+
+type RequestRow = {
+  notes: string | null;
+  start_date: string; // YYYY-MM-DD
+  end_date: string;   // YYYY-MM-DD
+  status: string | null;
+  type: string | null;
+};
+
+const LEAVE_BUCKETS: Record<string, string> = {
+  sick: "Sick",
+  sickness: "Sick",
+  ill: "Sick",
+  vacation: "Vacation",
+  annual: "Vacation",
+  holiday: "Vacation",
+  wedding: "Wedding",
+  marriage: "Wedding",
+  maternity: "Maternity",
+  paternity: "Paternity",
+  bereavement: "Bereavement",
+  unpaid: "Unpaid",
+  paid: "Paid",
+};
+
+function leaveNorm(v?: string | null) {
+  return (v ?? "").toString().trim().toLowerCase();
+}
+
+function bucketLeaveType(notes: string | null): string {
+  const key = leaveNorm(notes);
+  if (LEAVE_BUCKETS[key]) return LEAVE_BUCKETS[key];
+  if (key.includes("sick")) return "Sick";
+  if (key.includes("vacation") || key.includes("annual")) return "Vacation";
+  if (key.includes("wedding") || key.includes("marriage")) return "Wedding";
+  if (key.includes("matern")) return "Maternity";
+  if (key.includes("patern")) return "Paternity";
+  if (key.includes("bereave")) return "Bereavement";
+  if (key.includes("unpaid")) return "Unpaid";
+  if (key.includes("paid")) return "Paid";
+  return "Other";
+}
+
+function todayISO(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// ==== UI bits ====
 
 function SectionCard({
   title,
@@ -65,12 +118,11 @@ function SectionCard({
   rightLabel?: string;
   className?: string;
 }) {
-  const [month, setMonth] = useState(rightLabel ?? "July 2025");
+  const [month] = useState(rightLabel ?? "July 2025");
   return (
     <div className={cn("bg-white rounded-xl border border-gray-200 p-4 sm:p-6", className)}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        
       </div>
       {children}
     </div>
@@ -93,7 +145,7 @@ function LegendList({ items }: { items: { name: string; color: string }[] }) {
 type EmployeeRow = {
   id: string;
   department: string | null;
-  current_contract: string | null; 
+  current_contract: string | null;
 };
 
 export function ReportsOverview() {
@@ -162,6 +214,56 @@ export function ReportsOverview() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [rows]);
 
+  // ==== ADDED: Leaves state/effect (only active, up-to-date info for today) ====
+  const [leavesLoading, setLeavesLoading] = useState(true);
+  const [leavesErr, setLeavesErr] = useState<string | null>(null);
+  const [leavesRows, setLeavesRows] = useState<RequestRow[]>([]);
+
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      setLeavesLoading(true);
+      setLeavesErr(null);
+      const today = todayISO();
+
+      // Only currently active, approved leaves (type='Leave', status='approved', start_date <= today <= end_date)
+      const { data, error } = await supabase
+        .from("requests")
+        .select("notes, start_date, end_date, status, type")
+        .eq("type", "Leave")
+        .eq("status", "approved")
+        .lte("start_date", today)
+        .gte("end_date", today);
+
+      if (!ok) return;
+      if (error) {
+        setLeavesErr(error.message);
+        setLeavesRows([]);
+      } else {
+        setLeavesRows((data as RequestRow[]) || []);
+      }
+      setLeavesLoading(false);
+    })();
+    return () => {
+      ok = false;
+    };
+  }, []);
+
+  // Build Leaves dataset (percent of employees on each leave kind)
+  const leavesData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of leavesRows) {
+      const bucket = bucketLeaveType(r.notes);
+      counts[bucket] = (counts[bucket] || 0) + 1;
+    }
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [leavesRows]);
+
+  const totalLeaves = leavesData.reduce((s, d) => s + d.value, 0);
+  const noEmployees = rows.length === 0;
+  const totalEmp = employmentTypes.reduce((s, d) => s + d.value, 0);
+  const denomEmployees = rows.length || 1; // denominator for % in leaves tooltip
+
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -183,52 +285,96 @@ export function ReportsOverview() {
     );
   }
 
-  const noEmployees = rows.length === 0;
-
-  // Totals for % tooltips
-  const totalEmp = employmentTypes.reduce((s, d) => s + d.value, 0);
-
   return (
     <div className="space-y-6">
-      {/* Employment Types (from current_contract) */}
-      <SectionCard title="Employment Types" rightLabel="July 2025">
-        {noEmployees ? (
-          <div className="text-sm text-gray-500">No employees found.</div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6 items-center">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={employmentTypes}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={3}
-                  >
-                    {employmentTypes.map((_, idx) => (
-                      <Cell key={`cell-et-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ReTooltip
-                    formatter={(val: number, _n: string, entry: any) => {
-                      const pct = totalEmp ? ((val / totalEmp) * 100).toFixed(1) + "%" : "—";
-                      return [`${val} (${pct})`, entry?.name];
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+      {/* Employment Types + Leaves side-by-side */}
+      <div className="grid md:grid-cols-2 gap-6 items-stretch">
+        {/* Employment Types (existing) */}
+        <SectionCard title="Employment Types" rightLabel="July 2025">
+          {noEmployees ? (
+            <div className="text-sm text-gray-500">No employees found.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 items-center">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={employmentTypes}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {employmentTypes.map((_, idx) => (
+                        <Cell key={`cell-et-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <ReTooltip
+                      formatter={(val: number, _n: string, entry: any) => {
+                        const pct = totalEmp ? ((val / totalEmp) * 100).toFixed(1) + "%" : "—";
+                        return [`${val} (${pct})`, entry?.name];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <LegendList
+                items={employmentTypes.map((d, i) => ({
+                  name: d.name,
+                  color: PIE_COLORS[i % PIE_COLORS.length],
+                }))}
+              />
             </div>
-            <LegendList
-              items={employmentTypes.map((d, i) => ({
-                name: d.name,
-                color: PIE_COLORS[i % PIE_COLORS.length],
-              }))}
-            />
-          </div>
-        )}
-      </SectionCard>
+          )}
+        </SectionCard>
+
+        {/* NEW: Leaves (Today) */}
+        <SectionCard title="Leaves (Today)">
+          {leavesLoading ? (
+            <div className="text-sm text-gray-500">Loading…</div>
+          ) : leavesErr ? (
+            <div className="text-sm text-red-600">Failed to load leaves: {leavesErr}</div>
+          ) : totalLeaves === 0 ? (
+            <div className="text-sm text-gray-500">No active leaves today.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 items-center">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={leavesData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {leavesData.map((_, idx) => (
+                        <Cell key={`cell-leave-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <ReTooltip
+                      formatter={(val: number, _n: string, entry: any) => {
+                        // percent of all employees
+                        const pct = ((val / denomEmployees) * 100).toFixed(1) + "%";
+                        return [`${val} (${pct})`, entry?.name];
+                      }}
+                      labelFormatter={() => "Leave Type"}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <LegendList
+                items={leavesData.map((d, i) => ({
+                  name: d.name,
+                  color: PIE_COLORS[i % PIE_COLORS.length],
+                }))}
+              />
+            </div>
+          )}
+        </SectionCard>
+      </div>
 
       {/* Employees by Department */}
       <SectionCard title="Employees by Department">
