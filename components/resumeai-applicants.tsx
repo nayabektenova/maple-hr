@@ -1,179 +1,327 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { Search, Filter, ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
-type Applicant = {
-  id: string
-  name: string
-  jobTitle: string
-  compatibility: number // 0-100
-  resumeStatus: "View" | "Viewed"
-  decision?: "Approved" | "Declined"
-}
+type DBApplicant = {
+  id: string;
+  job_title: string;
+  full_name: string;
+  compatibility: number;
+  status: "View" | "Viewed";
+};
 
-const seedApplicants: Applicant[] = [
-  { id: "a1", name: "Hana Takahashi",  jobTitle: "Software Engineer I", compatibility: 75, resumeStatus: "Viewed" },
-  { id: "a2", name: "Amara Johnson",   jobTitle: "Software Engineer I", compatibility: 65, resumeStatus: "View" },
-  { id: "a3", name: "Sofia Haddad",    jobTitle: "Software Engineer I", compatibility: 99, resumeStatus: "Viewed", decision: "Approved" },
-  { id: "a4", name: "Marcus O'Connor", jobTitle: "Software Engineer I", compatibility:  4, resumeStatus: "Viewed", decision: "Declined" },
-  { id: "a5", name: "Ethan Patel",     jobTitle: "Software Engineer I", compatibility: 75, resumeStatus: "Viewed" },
-  { id: "a6", name: "Naomi Okafor",    jobTitle: "Software Engineer I", compatibility: 65, resumeStatus: "View" },
-  { id: "a7", name: "Emily Zhang",     jobTitle: "Software Engineer I", compatibility: 99, resumeStatus: "Viewed", decision: "Approved" },
-  { id: "a8", name: "Olivia Kim",      jobTitle: "Software Engineer I", compatibility:  4, resumeStatus: "Viewed", decision: "Declined" },
-  { id: "a9", name: "Dmitry Volkov",   jobTitle: "Software Engineer I", compatibility: 75, resumeStatus: "Viewed" },
-]
+type UIApplicant = {
+  id: string;
+  jobTitle: string;
+  name: string;
+  compatibility: number;
+  status: "View" | "Viewed";
+  decision?: "Approved" | "Declined";
+};
 
-const DECISIONS: Array<Applicant["decision"] | ""> = ["", "Approved", "Declined"]
-const RESUME_SEEN: Applicant["resumeStatus"][] = ["View", "Viewed"]
+const STATUS_FILTERS: Array<UIApplicant["status"] | ""> = ["", "View", "Viewed"];
+const DECISIONS: Array<UIApplicant["decision"] | ""> = ["", "Approved", "Declined"];
 
 export function ResumeAIApplicants() {
-  const params = useParams<{ jobId: string }>()
-  const jobId = params?.jobId
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const [rows, setRows] = useState<Applicant[]>(seedApplicants)
-  const [search, setSearch] = useState("")
-  const [decisionFilter, setDecisionFilter] = useState<Applicant["decision"] | "">("")
-  const [resumeFilter, setResumeFilter] = useState<Applicant["resumeStatus"] | "">("")
+  const rawFromParam = (params?.jobID ?? (params as any)?.jobId ?? (params as any)?.id) as string | undefined;
+  const rawFromQuery = searchParams.get("jobId") ?? undefined;
+  const rawJobId = rawFromParam ?? rawFromQuery;
+  const jobId = rawJobId && /^\d+$/.test(rawJobId) ? Number(rawJobId) : null;
+
+  const titleFromQuery = searchParams.get("title") ?? "";
+
+  const [jobTitle, setJobTitle] = useState<string>("");
+  const [rows, setRows] = useState<UIApplicant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // filters
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<UIApplicant["status"] | "">("");
+  const [decisionFilter, setDecisionFilter] = useState<UIApplicant["decision"] | "">("");
+
+  // for small UX feedback on click
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      // 1) Resolve Job Title
+      let title = (titleFromQuery ?? "").trim();
+      if (!title) {
+        if (!jobId) {
+          setErr("Invalid job id in route.");
+          setLoading(false);
+          return;
+        }
+
+        const { data: opening, error: openingErr } = await supabase
+          .from("job_openings")
+          .select("title")
+          .eq("job_id", jobId)
+          .maybeSingle();
+
+        if (!mounted) return;
+
+        if (openingErr) {
+          setErr(`Failed to fetch opening: ${openingErr.message}`);
+          setLoading(false);
+          return;
+        }
+        if (!opening?.title) {
+          setErr("No job title found for this opening.");
+          setLoading(false);
+          return;
+        }
+        title = opening.title as string;
+      }
+
+      setJobTitle(title);
+
+      // 2) Fetch applicants for the title
+      const { data: applicants, error: appsErr } = await supabase
+        .from("resumeai_applicants")
+        .select("id, job_title, full_name, compatibility, status")
+        .eq("job_title", title)
+        .order("compatibility", { ascending: false });
+
+      if (!mounted) return;
+
+      if (appsErr) {
+        setErr(`Failed to fetch applicants: ${appsErr.message}`);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+
+      const mapped: UIApplicant[] = (applicants ?? []).map((a: DBApplicant) => ({
+        id: a.id,
+        jobTitle: a.job_title,
+        name: a.full_name,
+        compatibility: a.compatibility,
+        status: a.status,
+      }));
+
+      setRows(mapped);
+      setLoading(false);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [jobId, titleFromQuery]);
 
   const visible = useMemo(() => {
     return rows.filter((r) => {
-      const matchesQ = r.name.toLowerCase().includes(search.toLowerCase())
-      const matchesD = decisionFilter ? r.decision === decisionFilter : true
-      const matchesR = resumeFilter ? r.resumeStatus === resumeFilter : true
-      return matchesQ && matchesD && matchesR
-    })
-  }, [rows, search, decisionFilter, resumeFilter])
+      const q = (search ?? "").toLowerCase();
+      const matchesQ = r.name.toLowerCase().includes(q);
+      const matchesS = statusFilter ? r.status === statusFilter : true;
+      const matchesD = decisionFilter ? r.decision === decisionFilter : true;
+      return matchesQ && matchesS && matchesD;
+    });
+  }, [rows, search, statusFilter, decisionFilter]);
 
-  const setDecision = (id: string, d: Exclude<Applicant["decision"], undefined>) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, decision: d } : r)))
+  // NEW: Mark as viewed and navigate
+  async function handleOpenApplicant(app: UIApplicant) {
+    if (!jobId) {
+      // still navigate if you came via ?title=... only
+      setUpdatingId(app.id);
+      try {
+        // optimistic UI update
+        setRows((prev) =>
+          prev.map((r) => (r.id === app.id ? { ...r, status: "Viewed" } : r))
+        );
+        // fire-and-wait update (ok to await; navigation will be instant after)
+        await supabase.from("resumeai_applicants").update({ status: "Viewed" }).eq("id", app.id);
+      } catch (_) {
+        // ignore; we already optimistically updated
+      } finally {
+        setUpdatingId(null);
+        router.push(`/resume-ai/${jobId ?? ""}/applicant/${app.id}`);
+      }
+      return;
+    }
+
+    setUpdatingId(app.id);
+    try {
+      setRows((prev) =>
+        prev.map((r) => (r.id === app.id ? { ...r, status: "Viewed" } : r))
+      );
+      await supabase.from("resumeai_applicants").update({ status: "Viewed" }).eq("id", app.id);
+    } catch (_) {
+      // noop
+    } finally {
+      setUpdatingId(null);
+      router.push(`/resume-ai/${jobId}/applicant/${app.id}`);
+    }
+  }
+
+  const setDecision = (id: string, d: Exclude<UIApplicant["decision"], undefined>) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, decision: d } : r)));
+  };
+
+  if (loading) {
+    return <div className="bg-white rounded-lg border border-gray-200 p-6">Loading applicants…</div>;
+  }
+
+  if (err) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6 text-red-600">
+        Error: {err}{" "}
+        <button className="ml-2 underline" onClick={() => router.replace("/resume-ai")}>
+          Go to overview
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* Header toolbar */}
+      {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         <div className="flex items-center gap-4">
           <Link href="/resume-ai" className="inline-flex items-center gap-2 text-gray-700 hover:underline mr-2">
-            <ArrowLeft className="h-4 w-4" /> Back
+            ← Back
           </Link>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search"
+          <div className="text-gray-900 font-medium">Applicants — {jobTitle || "Unknown role"}</div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              aria-label="Search by name"
+              placeholder="Search by name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm"
             />
+
+            <select
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              {STATUS_FILTERS.map((s) => (
+                <option key={s || "all"} value={s}>
+                  {s || "All statuses"}
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Filter by decision"
+              value={decisionFilter}
+              onChange={(e) => setDecisionFilter(e.target.value as any)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              {DECISIONS.map((d) => (
+                <option key={d || "all"} value={d}>
+                  {d || "All decisions"}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("");
+                setDecisionFilter("");
+              }}
+              className="border border-gray-300 rounded-md px-3 py-1.5 text-sm hover:bg-gray-50"
+            >
+              Clear
+            </button>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                <Filter className="h-4 w-4" />
-                Filters
-                {resumeFilter ? `: ${resumeFilter}` : ""}
-                {decisionFilter ? ` • ${decisionFilter}` : ""}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Resume</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setResumeFilter("")}>All</DropdownMenuItem>
-              {RESUME_SEEN.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => setResumeFilter(s)}>{s}</DropdownMenuItem>
-              ))}
-
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Decisions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setDecisionFilter("")}>All</DropdownMenuItem>
-              {DECISIONS.filter(Boolean).map((d) => (
-                <DropdownMenuItem key={d as string} onClick={() => setDecisionFilter(d as any)}>
-                  {d}
-                </DropdownMenuItem>
-              ))}
-
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setResumeFilter(""); setDecisionFilter(""); }}>
-                Clear filters
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          
         </div>
       </div>
 
       {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-32">Compatibility</TableHead>
-            <TableHead>Full Name</TableHead>
-            <TableHead>Job Title</TableHead>
-            <TableHead>Resume</TableHead>
-            <TableHead className="w-60 text-right">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {visible.map((r) => (
-            <TableRow key={r.id} className="hover:bg-gray-50">
-              <TableCell className="font-medium">{r.compatibility}%</TableCell>
-              <TableCell className="text-gray-700">{r.name}</TableCell>
-              <TableCell className="text-gray-600">{r.jobTitle}</TableCell>
-              <TableCell>
-                {r.resumeStatus === "View" ? (
-                    <Link href={`/resume-ai/${jobId}/applicant/${r.id}`} className="text-green-700 hover:underline">
-                    View
-                    </Link>
-                ) : (
-                    <Link href={`/resume-ai/${jobId}/applicant/${r.id}`} className="text-gray-700 hover:underline">
-                    Viewed
-                    </Link>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                {r.decision ? (
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left">
+            <tr>
+              <th className="px-6 py-3 font-medium text-gray-600 w-32">Compatibility</th>
+              <th className="px-6 py-3 font-medium text-gray-600">Full Name</th>
+              <th className="px-6 py-3 font-medium text-gray-600">Job Title</th>
+              <th className="px-6 py-3 font-medium text-gray-600">Status</th>
+              <th className="px-6 py-3 font-medium text-gray-600 text-right w-60">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((r) => (
+              <tr key={r.id} className="hover:bg-gray-50 border-t">
+                <td className="px-6 py-3 font-medium">{r.compatibility}%</td>
+                <td className="px-6 py-3 text-gray-700">{r.name}</td>
+                <td className="px-6 py-3 text-gray-600">{r.jobTitle}</td>
 
-                  <span
-                    className={cn(
-                      "px-2 py-1 rounded-md text-sm",
-                      r.decision === "Approved"
-                        ? "text-green-700 bg-green-50 border border-green-200"
-                        : "text-red-700 bg-red-50 border border-red-200"
-                    )}
+                {/* Changed: status is a button that updates DB then navigates */}
+                <td className="px-6 py-3">
+                  <button
+                    onClick={() => handleOpenApplicant(r)}
+                    disabled={updatingId === r.id}
+                    className={
+                      "underline " +
+                      (r.status === "View" ? "text-green-700" : "text-gray-700")
+                    }
+                    aria-label={`Open ${r.name} resume`}
                   >
-                    {r.decision}
-                  </span>
-                ) : (
-                  <div className="flex items-center justify-end gap-3">
-                    <Button variant="outline" onClick={() => setDecision(r.id, "Approved")} className="border-green-600 text-green-700 hover:bg-green-50">
-                      Approve
-                    </Button>
-                    <button className="text-gray-500 hover:underline" onClick={() => setDecision(r.id, "Declined")}>
-                      Decline
-                    </button>
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                    {updatingId === r.id ? "Opening…" : r.status}
+                  </button>
+                </td>
+
+                <td className="px-6 py-3 text-right">
+                  {r.decision ? (
+                    <span
+                      className={
+                        "inline-block px-2 py-1 rounded-md text-sm border " +
+                        (r.decision === "Approved"
+                          ? "text-green-700 bg-green-50 border-green-200"
+                          : "text-red-700 bg-red-50 border-red-200")
+                      }
+                    >
+                      {r.decision}
+                    </span>
+                  ) : (
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setDecision(r.id, "Approved")}
+                        className="border border-green-600 text-green-700 rounded-md px-3 py-1.5 text-sm hover:bg-green-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="text-gray-600 underline text-sm"
+                        onClick={() => setDecision(r.id, "Declined")}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+
+            {visible.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
+                  No applicants found for “{jobTitle}”.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  )
+  );
 }
