@@ -30,7 +30,6 @@ export function ResumeAIApplicants() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Support folder param [jobID] and query (?jobId=123), plus optional ?title=
   const rawFromParam = (params?.jobID ?? (params as any)?.jobId ?? (params as any)?.id) as string | undefined;
   const rawFromQuery = searchParams.get("jobId") ?? undefined;
   const rawJobId = rawFromParam ?? rawFromQuery;
@@ -43,10 +42,13 @@ export function ResumeAIApplicants() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Filters
+  // filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<UIApplicant["status"] | "">("");
   const [decisionFilter, setDecisionFilter] = useState<UIApplicant["decision"] | "">("");
+
+  // for small UX feedback on click
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -55,9 +57,8 @@ export function ResumeAIApplicants() {
       setLoading(true);
       setErr(null);
 
-      // 1) Resolve job title
-      let title = titleFromQuery.trim();
-
+      // 1) Resolve Job Title
+      let title = (titleFromQuery ?? "").trim();
       if (!title) {
         if (!jobId) {
           setErr("Invalid job id in route.");
@@ -83,13 +84,12 @@ export function ResumeAIApplicants() {
           setLoading(false);
           return;
         }
-
         title = opening.title as string;
       }
 
       setJobTitle(title);
 
-      // 2) Fetch applicants by title
+      // 2) Fetch applicants for the title
       const { data: applicants, error: appsErr } = await supabase
         .from("resumeai_applicants")
         .select("id, job_title, full_name, compatibility, status")
@@ -124,15 +124,50 @@ export function ResumeAIApplicants() {
 
   const visible = useMemo(() => {
     return rows.filter((r) => {
-      const matchesQ = r.name.toLowerCase().includes((search ?? "").toLowerCase());
+      const q = (search ?? "").toLowerCase();
+      const matchesQ = r.name.toLowerCase().includes(q);
       const matchesS = statusFilter ? r.status === statusFilter : true;
       const matchesD = decisionFilter ? r.decision === decisionFilter : true;
       return matchesQ && matchesS && matchesD;
     });
   }, [rows, search, statusFilter, decisionFilter]);
 
+  // NEW: Mark as viewed and navigate
+  async function handleOpenApplicant(app: UIApplicant) {
+    if (!jobId) {
+      // still navigate if you came via ?title=... only
+      setUpdatingId(app.id);
+      try {
+        // optimistic UI update
+        setRows((prev) =>
+          prev.map((r) => (r.id === app.id ? { ...r, status: "Viewed" } : r))
+        );
+        // fire-and-wait update (ok to await; navigation will be instant after)
+        await supabase.from("resumeai_applicants").update({ status: "Viewed" }).eq("id", app.id);
+      } catch (_) {
+        // ignore; we already optimistically updated
+      } finally {
+        setUpdatingId(null);
+        router.push(`/resume-ai/${jobId ?? ""}/applicant/${app.id}`);
+      }
+      return;
+    }
+
+    setUpdatingId(app.id);
+    try {
+      setRows((prev) =>
+        prev.map((r) => (r.id === app.id ? { ...r, status: "Viewed" } : r))
+      );
+      await supabase.from("resumeai_applicants").update({ status: "Viewed" }).eq("id", app.id);
+    } catch (_) {
+      // noop
+    } finally {
+      setUpdatingId(null);
+      router.push(`/resume-ai/${jobId}/applicant/${app.id}`);
+    }
+  }
+
   const setDecision = (id: string, d: Exclude<UIApplicant["decision"], undefined>) => {
-    // UI-only (not persisted)
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, decision: d } : r)));
   };
 
@@ -229,14 +264,22 @@ export function ResumeAIApplicants() {
                 <td className="px-6 py-3 font-medium">{r.compatibility}%</td>
                 <td className="px-6 py-3 text-gray-700">{r.name}</td>
                 <td className="px-6 py-3 text-gray-600">{r.jobTitle}</td>
+
+                {/* Changed: status is a button that updates DB then navigates */}
                 <td className="px-6 py-3">
-                  <Link
-                    href={`/resume-ai/${jobId ?? ""}/applicant/${r.id}`}
-                    className={r.status === "View" ? "text-green-700 underline" : "text-gray-700 underline"}
+                  <button
+                    onClick={() => handleOpenApplicant(r)}
+                    disabled={updatingId === r.id}
+                    className={
+                      "underline " +
+                      (r.status === "View" ? "text-green-700" : "text-gray-700")
+                    }
+                    aria-label={`Open ${r.name} resume`}
                   >
-                    {r.status}
-                  </Link>
+                    {updatingId === r.id ? "Opening…" : r.status}
+                  </button>
                 </td>
+
                 <td className="px-6 py-3 text-right">
                   {r.decision ? (
                     <span
@@ -258,8 +301,8 @@ export function ResumeAIApplicants() {
                         Approve
                       </button>
                       <button
-                        onClick={() => setDecision(r.id, "Declined")}
                         className="text-gray-600 underline text-sm"
+                        onClick={() => setDecision(r.id, "Declined")}
                       >
                         Decline
                       </button>
