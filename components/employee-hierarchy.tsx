@@ -159,9 +159,7 @@ export default function EmployeeHierarchy() {
             ))}
           </CustomSelect>
 
-          <Button className="bg-green-600 hover:bg-green-700" size="sm" onClick={() => {}}>
-            Department
-          </Button>
+          <span className="ml-2 text-sm font-larg text-gray-700">Department</span>
         </div>
 
         <div className="ml-auto text-sm text-gray-500">{department || "No department selected"}</div>
