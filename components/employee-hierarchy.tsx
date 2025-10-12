@@ -1,8 +1,8 @@
+// components/employee-hierarchy.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
-import { Button } from "@/components/ui/button"
 
 // ---- Types ----
 type EmployeeRow = {
@@ -27,12 +27,11 @@ const CustomSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
 )
 
 /**
- * EmployeeHierarchy component
- *
- * Shows a department selector. For the selected department it displays:
- * Manager -> Assistant Manager -> Supervisor -> all Staff
- *
- * Boxes display: Name, Role, Position
+ * EmployeeHierarchy
+ * - Single department select
+ * - Renders Manager -> Assistant Manager -> Supervisor -> Staff
+ * - Boxes show: Name, Role, Position (darker & bolder)
+ * - Decorative SVG lines connect levels
  */
 export default function EmployeeHierarchy() {
   const [loading, setLoading] = useState(true)
@@ -41,7 +40,6 @@ export default function EmployeeHierarchy() {
   const [department, setDepartment] = useState<string>("")
   const [departments, setDepartments] = useState<string[]>([])
 
-  // Load all employees once (so we can build department list)
   useEffect(() => {
     let mounted = true
     async function loadAll() {
@@ -64,7 +62,6 @@ export default function EmployeeHierarchy() {
           new Set(mapped.map((r) => (r.department ?? "").trim()).filter(Boolean))
         ).sort()
         setDepartments(depts)
-        // auto-select first department if exists
         if (depts.length > 0) setDepartment((prev) => (prev || depts[0]))
       }
       setLoading(false)
@@ -75,27 +72,24 @@ export default function EmployeeHierarchy() {
     }
   }, [])
 
-  // Filter employees for currently selected department
   const deptEmployees = useMemo(
     () => rows.filter((r) => (r.department ?? "") === (department ?? "")),
     [rows, department]
   )
 
-  // Roles normalization helper (some DB values might vary in capitalization)
   const roleMatch = (r: string | null, target: string) =>
     !!r && r.toLowerCase().trim() === target.toLowerCase().trim()
 
-  // Find single Manager, Assistant Manager and Supervisor. If multiples exist, pick first.
   const manager = deptEmployees.find((e) => roleMatch(e.role, "Manager"))
   const assistantManager =
     deptEmployees.find((e) => roleMatch(e.role, "Assistant manager")) ??
     deptEmployees.find((e) => roleMatch(e.role, "Assistant Manager")) ??
-    deptEmployees.find((e) => roleMatch(e.role, "Assistant")) // fallback
+    deptEmployees.find((e) => roleMatch(e.role, "Assistant"))
   const supervisor =
     deptEmployees.find((e) => roleMatch(e.role, "Supervisor")) ??
     deptEmployees.find((e) => roleMatch(e.role, "supervisor"))
 
-  // All staff (role === Staff or anything not in the top 3)
+  // Staff = anything not manager/assistant/supervisor and non-empty role (or role === 'Staff')
   const staff = deptEmployees.filter((e) => {
     const r = (e.role ?? "").toLowerCase().trim()
     return (
@@ -103,17 +97,16 @@ export default function EmployeeHierarchy() {
       r !== "assistant manager" &&
       r !== "assistant" &&
       r !== "supervisor" &&
-      r !== "supervisor" &&
       r !== ""
     )
   })
 
-  // Render helpers
-  const box = (e: EmployeeRow | undefined | null) => {
+  // Box rendering (darker text)
+  const Box = ({ e }: { e?: EmployeeRow | null }) => {
     if (!e) {
       return (
-        <div className="min-w-[220px] max-w-[260px] text-center py-3 px-4 border border-gray-200 rounded-md bg-white shadow-sm">
-          <div className="text-sm text-gray-400">Not assigned</div>
+        <div className="min-w-[220px] max-w-[260px] text-center py-4 px-6 border border-gray-200 rounded-md bg-white">
+          <div className="text-sm text-gray-500">Not assigned</div>
         </div>
       )
     }
@@ -121,10 +114,10 @@ export default function EmployeeHierarchy() {
     const role = e.role ?? "Unknown"
     const position = e.position ?? "—"
     return (
-      <div className="min-w-[220px] max-w-[260px] text-center py-3 px-4 border-2 border-green-300 rounded-md bg-white shadow-sm">
-        <div className="text-sm font-medium text-gray-700">{name}</div>
-        <div className="text-xs text-gray-400 mt-1">{role}</div>
-        <div className="text-xs text-gray-500 mt-1">{position}</div>
+      <div className="min-w-[220px] max-w-[260px] text-center py-4 px-6 border-2 border-green-300 rounded-md bg-white shadow-sm">
+        <div className="font-semibold text-gray-900 text-sm">{name}</div>
+        <div className="text-gray-800 text-sm mt-1">{role}</div>
+        <div className="text-gray-700 text-xs mt-1">{position}</div>
       </div>
     )
   }
@@ -141,71 +134,150 @@ export default function EmployeeHierarchy() {
     )
   }
 
+  /**
+   * SVG helpers for connectors
+   * - Vertical connectors between the stacked nodes use simple line segments.
+   * - The branch to staff draws a vertical line and then a horizontal bar with evenly spaced ticks.
+   */
+  const VerticalGap = ({ height = 32 }: { height?: number }) => (
+    <div className="flex items-center" aria-hidden>
+      <svg width="2" height={height} viewBox={`0 0 2 ${height}`} preserveAspectRatio="none">
+        <line x1="1" y1="0" x2="1" y2={height} stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    </div>
+  )
+
+  const BranchToStaff = ({ count = 1 }: { count: number }) => {
+    // make a responsive viewBox width depending on count
+    const minWidth = 360
+    const per = 160 // spacing per staff
+    const width = Math.max(minWidth, Math.max(1, count) * per)
+    const height = 48
+    // center line Y positions
+    const verticalToHorizontal = 8
+    const hY = verticalToHorizontal + 6
+    // compute x positions for ticks evenly spaced across the middle horizontal line
+    const padding = 24
+    const usable = width - padding * 2
+    const xs = Array.from({ length: count }).map((_, i) =>
+      Math.round(padding + (i + 0.5) * (usable / count))
+    )
+
+    return (
+      <div className="w-full flex justify-center pointer-events-none" aria-hidden>
+        <svg
+          width="100%"
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* vertical line from supervisor downward */}
+          <line
+            x1={width / 2}
+            y1="0"
+            x2={width / 2}
+            y2={verticalToHorizontal}
+            stroke="#cbd5e1"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* horizontal main bar */}
+          <line
+            x1={padding}
+            y1={hY}
+            x2={width - padding}
+            y2={hY}
+            stroke="#e2e8f0"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* vertical ticks up to staff (short) */}
+          {xs.map((x, idx) => (
+            <line
+              key={idx}
+              x1={x}
+              y1={hY}
+              x2={x}
+              y2={hY + 14}
+              stroke="#cbd5e1"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* center small connector from vertical down to horizontal (short) */}
+          <line
+            x1={width / 2}
+            y1={verticalToHorizontal}
+            x2={width / 2}
+            y2={hY}
+            stroke="#cbd5e1"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* Top controls similar to your employee-list layout */}
+      {/* Top controls */}
       <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <CustomSelect
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            aria-label="Select department"
-          >
-            {departments.length === 0 && <option value="">No departments</option>}
-            {departments.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </CustomSelect>
+        <CustomSelect value={department} onChange={(e) => setDepartment(e.target.value)}>
+          {departments.length === 0 && <option value="">No departments</option>}
+          {departments.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </CustomSelect>
 
-          <span className="ml-2 text-sm font-larg text-gray-700">Department</span>
-        </div>
+        {/* Plain text label (no button) */}
+        <span className="ml-2 text-sm font-medium text-gray-700">Department</span>
 
         <div className="ml-auto text-sm text-gray-500">{department || "No department selected"}</div>
       </div>
 
-      {/* Hierarchy container */}
+      {/* Hierarchy */}
       <div className="p-8">
         {department ? (
-          <div className="flex flex-col items-center w-full">
+          <div className="flex flex-col items-center w-full space-y-6">
             {/* Manager */}
-            <div className="mb-6 flex flex-col items-center">
-              {box(manager)}
+            <div className="flex flex-col items-center">
+              <Box e={manager} />
             </div>
 
-            {/* vertical connecting line */}
-            <div className="w-px bg-gray-300 h-6" />
+            <VerticalGap height={28} />
 
             {/* Assistant Manager */}
-            <div className="mt-6 mb-6 flex flex-col items-center">
-              {box(assistantManager)}
+            <div className="flex flex-col items-center">
+              <Box e={assistantManager} />
             </div>
 
-            <div className="w-px bg-gray-300 h-6" />
+            <VerticalGap height={28} />
 
             {/* Supervisor */}
-            <div className="mt-6 mb-6 flex flex-col items-center">
-              {box(supervisor)}
+            <div className="flex flex-col items-center">
+              <Box e={supervisor} />
             </div>
 
-            <div className="w-px bg-gray-300 h-6" />
+            {/* Branch to staff */}
+            <BranchToStaff count={Math.max(1, staff.length || 1)} />
 
-            {/* Staff row */}
-            <div className="mt-6 w-full">
-              <div className="flex justify-center">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {staff.length > 0 ? (
-                    staff.map((s) => (
-                      <div key={s.id} className="flex justify-center">
-                        {box(s)}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-500">No staff for this department</div>
-                  )}
+            {/* Staff row: center aligned; grid is responsive */}
+            <div className="w-full flex justify-center">
+              {staff.length > 0 ? (
+                <div className="flex flex-wrap gap-6 justify-center mt-4">
+                  {staff.map((s) => (
+                    <div key={s.id} className="flex justify-center">
+                      <Box e={s} />
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <div className="text-sm text-gray-500 mt-2">No staff for this department</div>
+              )}
             </div>
           </div>
         ) : (
