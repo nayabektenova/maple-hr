@@ -98,9 +98,33 @@ export default function Requests() {
 
 
   React.useEffect(() => {
-    const existing = load();
-    if (!existing.length) seed();
-    setRows(load());
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      const { data, error } = await supabase
+        .from("hr_requests")
+        .select(`
+          id, type, employee_id, employee_name, submitted_at,
+          date_start, date_end, amount, notes, status,
+          processed_at, processed_by, decline_reason, is_demo
+        `)
+        .order("submitted_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        setErr(error.message);
+        setRows([]);
+      } else {
+        setRows((data ?? []).map(toHr));
+      }
+
+      setLoading(false);
+    })();
+
+    return () => { mounted = false; };
   }, []);
 
   const list = React.useMemo(() => {
