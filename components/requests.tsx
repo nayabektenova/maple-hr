@@ -141,8 +141,33 @@ export default function Requests() {
   const patch = (next: HrRequest) =>
     setRows((prev) => { const arr = prev.map((x) => (x.id === next.id ? next : x)); save(arr); return arr; });
 
-  const approve = (r: HrRequest) =>
-    r.status === "pending" && patch({ ...r, status: "approved", processedAt: new Date().toISOString(), processedBy: "Admin" });
+  const approve = async (r: HrRequest) => {
+    if (r.status !== "pending") return;
+
+    const next: HrRequest = {
+      ...r,
+      status: "approved",
+      processedAt: new Date().toISOString(),
+      processedBy: "Admin",
+    };
+
+    setRows((prev) => prev.map((x) => (x.id === r.id ? next : x)));
+
+    const { error } = await supabase
+      .from("hr_requests")
+      .update({
+        status: "approved",
+        processed_at: next.processedAt,
+        processed_by: next.processedBy,
+        decline_reason: null,
+      })
+      .eq("id", r.id);
+
+    if (error) {
+      alert(`Approve failed: ${error.message}`);
+      setRows((prev) => prev.map((x) => (x.id === r.id ? r : x)));
+    }
+  };
 
   const decline = (r: HrRequest, why: string) =>
     r.status === "pending" &&
