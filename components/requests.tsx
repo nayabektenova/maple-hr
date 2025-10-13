@@ -167,51 +167,40 @@ export default function Requests() {
           <TableBody>
             {list.map((r) => (
               <TableRow key={r.id} className="hover:bg-gray-50">
-                {/* TYPE with icon-only “view” on the LEFT */}
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    {/* View — outline green */}
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="View details"
+                      variant="outline"
+                      className="border-green-600 text-green-700 hover:bg-green-50"
                       onClick={() => { setSel(r); setViewOpen(true); }}
                     >
-                      <Eye className="h-4 w-4" />
+                      <Eye className="mr-2 h-4 w-4" /> View
                     </Button>
-                    <span>{r.type}</span>
-                  </div>
-                </TableCell>
 
-                <TableCell>
-                  <div className="leading-tight">
-                    <div className="font-medium">{r.employeeName}</div>
-                    <div className="text-xs text-muted-foreground">ID: {r.employeeId}</div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-gray-600">{fmt(r.submittedAt)}</TableCell>
-                <TableCell className="text-gray-700">
-                  {r.type === "Expense" && typeof r.amount === "number"
-                    ? `Amount: $${r.amount.toFixed(2)}`
-                    : r.dateRange
-                    ? `Dates: ${r.dateRange.start} → ${r.dateRange.end}`
-                    : r.notes ?? "—"}
-                </TableCell>
-                <TableCell><StatusBadge s={r.status} /></TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={r.status !== "pending"} onClick={() => approve(r)}>
-                      <Check className="mr-2 h-4 w-4" /> Approve
-                    </Button>
+                    {/* Approve — solid green */}
                     <Button
                       size="sm"
-                      variant="destructive"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={r.status !== "pending"}
+                      onClick={() => approve(r)}
+                    >
+                      <Check className="mr-2 h-4 w-4" /> Approve
+                    </Button>
+
+                    {/* Decline — red text link */}
+                    <button
+                      className="text-red-600 hover:underline text-sm"
                       disabled={r.status !== "pending"}
                       onClick={() => { setSel(r); setReason(""); setDeclineOpen(true); }}
                     >
-                      <X className="mr-2 h-4 w-4" /> Decline
-                    </Button>
+                      <span className="inline-flex items-center">
+                        <X className="mr-2 h-4 w-4" /> Decline
+                      </span>
+                    </button>
                   </div>
                 </TableCell>
+
               </TableRow>
             ))}
             {list.length === 0 && (
