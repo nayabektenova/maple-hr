@@ -167,32 +167,36 @@ export default function Requests() {
           <TableBody>
             {list.map((r) => (
               <TableRow key={r.id} className="hover:bg-gray-50">
-                <TableCell className="text-right">
-                  <TableCell className="font-medium">{r.type}</TableCell>
+                {/* Type */}
+                <TableCell className="font-medium">{r.type}</TableCell>
 
-                  <TableCell>
-                    <div className="leading-tight">
-                      <div className="font-medium">{r.employeeName}</div>
-                      <div className="text-xs text-muted-foreground">ID: {r.employeeId}</div>
-                    </div>
-                  </TableCell>
+                {/* Employee */}
+                <TableCell>
+                  <div className="leading-tight">
+                    <div className="font-medium">{r.employeeName}</div>
+                    <div className="text-xs text-muted-foreground">ID: {r.employeeId}</div>
+                  </div>
+                </TableCell>
 
+                {/* Submitted */}
+                <TableCell className="text-gray-600">{fmt(r.submittedAt)}</TableCell>
 
-                  <TableCell className="text-gray-600">{fmt(r.submittedAt)}</TableCell>
+                {/* Details */}
+                <TableCell className="text-gray-700">
+                  {r.type === "Expense" && typeof r.amount === "number"
+                    ? `Amount: $${r.amount.toFixed(2)}`
+                    : r.dateRange
+                    ? `Dates: ${r.dateRange.start} → ${r.dateRange.end}`
+                    : r.notes ?? "—"}
+                </TableCell>
 
-                  <TableCell className="text-gray-700">
-                    {r.type === "Expense" && typeof r.amount === "number"
-                      ? `Amount: $${r.amount.toFixed(2)}`
-                      : r.dateRange
-                      ? `Dates: ${r.dateRange.start} → ${r.dateRange.end}`
-                      : r.notes ?? "—"}
-                  </TableCell>
-
-                  <TableCell>
+                {/* Status */}
+                <TableCell>
                   <StatusBadge s={r.status} />
-                  </TableCell>
+                </TableCell>
 
-
+                {/* Actions (right-aligned) */}
+                <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-3">
                     {/* View — outline green */}
                     <Button
@@ -225,9 +229,9 @@ export default function Requests() {
                     </button>
                   </div>
                 </TableCell>
-
               </TableRow>
             ))}
+
             {list.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
@@ -236,6 +240,7 @@ export default function Requests() {
               </TableRow>
             )}
           </TableBody>
+
         </Table>
       
         {/* View dialog */}
