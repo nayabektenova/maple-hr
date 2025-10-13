@@ -198,7 +198,94 @@ export default function Requests() {
     }
   };
 
-  const reset = () => { seed(); setRows(load()); setQ(""); setTypeFilter(""); setStatusFilter(""); setSel(null); setViewOpen(false); setDeclineOpen(false); setReason(""); };
+  async function seedDemoIntoDB() {
+    const demoRows = [
+      {
+        type: "Leave" as HrType,
+        employee_id: "000915041",
+        employee_name: "Abel Fekadu",
+        submitted_at: new Date(Date.now() - 3 * 864e5).toISOString(),
+        date_start: "2025-09-20",
+        date_end: "2025-09-25",
+        notes: "Family trip – PTO",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+      {
+        type: "Shift Change" as HrType,
+        employee_id: "000394998",
+        employee_name: "Hunter Tapping",
+        submitted_at: new Date(Date.now() - 20 * 36e5).toISOString(),
+        date_start: "2025-09-22",
+        date_end: "2025-09-22",
+        notes: "Swap evening shift with Naya",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+      {
+        type: "Expense" as HrType,
+        employee_id: "000957380",
+        employee_name: "Naya Bektenova",
+        submitted_at: new Date(Date.now() - 6 * 36e5).toISOString(),
+        amount: 124.56,
+        notes: "Conference taxi receipts",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+    ];
+    const { error } = await supabase.from("hr_requests").insert(demoRows);
+    if (error) throw error;
+  }
+
+  const reset = async () => {
+    setLoading(true);
+    setErr(null);
+
+    const { error: delErr } = await supabase
+      .from("hr_requests")
+      .delete()
+      .eq("is_demo", true);
+
+    if (delErr) {
+      setLoading(false);
+      setErr(delErr.message);
+      return;
+    }
+
+    try {
+      await seedDemoIntoDB();
+    } catch (e: any) {
+      setLoading(false);
+      setErr(e?.message ?? String(e));
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("hr_requests")
+      .select(`
+        id, type, employee_id, employee_name, submitted_at,
+        date_start, date_end, amount, notes, status,
+        processed_at, processed_by, decline_reason, is_demo
+      `)
+      .order("submitted_at", { ascending: false });
+
+    if (error) {
+      setErr(error.message);
+      setRows([]);
+    } else {
+      setRows((data ?? []).map(toHr));
+    }
+
+    setQ("");
+    setTypeFilter("");
+    setStatusFilter("");
+    setSel(null);
+    setViewOpen(false);
+    setDeclineOpen(false);
+    setReason("");
+    setLoading(false);
+  };
+
 
   const StatusBadge = ({ s }: { s: RequestStatus }) => (
     <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>{s}</Badge>
