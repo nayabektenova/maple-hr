@@ -1,17 +1,25 @@
-// components/requests.tsx
+// TOP OF FILE
 "use client";
 
 import * as React from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+// import Link from "next/link"; // keep only if you actually link somewhere
+import { Search, Filter, Check, X, Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Check, X, Eye, RotateCcw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
@@ -87,43 +95,59 @@ export default function Requests() {
   );
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle className="text-base">Request Management</CardTitle>
+  <div className="bg-white rounded-lg border border-gray-200 px-8">
+    {/* Top toolbar */}
+    <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
+      <div className="flex items-center gap-4">
+        {/* Search input with icon */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setQ(e.target.value); }}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Filters dropdown (Type + Status) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+              <Filter className="h-4 w-4" />
+              Filters
+              {typeFilter ? `: ${typeFilter}` : ""}
+              {statusFilter ? ` • ${statusFilter}` : ""}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuLabel>Type</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setTypeFilter("")}>All</DropdownMenuItem>
+            {(["Leave", "Shift Change", "Expense"] as HrType[]).map((t) => (
+              <DropdownMenuItem key={t} onClick={() => setTypeFilter(t)}>{t}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setStatusFilter("")}>All</DropdownMenuItem>
+            {(["pending", "approved", "declined"] as RequestStatus[]).map((s) => (
+              <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}>{s}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { setTypeFilter(""); setStatusFilter(""); }}>
+              Clear filters
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Reset demo data button */}
         <Button variant="outline" size="sm" onClick={reset}>
           <RotateCcw className="mr-2 h-4 w-4" /> Reset demo data
         </Button>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Filters */}
-        <div className="grid gap-3 md:grid-cols-[1fr_200px_200px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, ID, notes…" className="pl-9" />
-          </div>
-
-          {/* Selects use 'all' sentinel to avoid empty value error */}
-          <Select value={typeFilter || "all"} onValueChange={(v) => setTypeFilter(v === "all" ? "" : (v as HrType))}>
-            <SelectTrigger><SelectValue placeholder="Type (All)" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="Leave">Leave</SelectItem>
-              <SelectItem value="Shift Change">Shift Change</SelectItem>
-              <SelectItem value="Expense">Expense</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : (v as RequestStatus))}>
-            <SelectTrigger><SelectValue placeholder="Status (All)" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+    </div>
 
         <Separator />
 
