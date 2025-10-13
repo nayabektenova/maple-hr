@@ -174,7 +174,7 @@ export function ResumeAIJobOpenings() {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
+    <div className="bg-white rounded-lg border border-gray-200 px-8">
       {/* Header toolbar */}
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         <div className="flex items-center gap-4">
