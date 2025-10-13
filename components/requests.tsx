@@ -155,14 +155,15 @@ export default function Requests() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Employee</TableHead>
-              <TableHead>Submitted</TableHead>
+              <TableHead className="w-40">Type</TableHead>
+              <TableHead className="w-[260px]">Employee</TableHead>
+              <TableHead className="w-48">Submitted</TableHead>
               <TableHead>Details</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[220px]">Actions</TableHead>
+              <TableHead className="w-28">Status</TableHead>
+              <TableHead className="w-64 text-right"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {list.map((r) => (
               <TableRow key={r.id} className="hover:bg-gray-50">
