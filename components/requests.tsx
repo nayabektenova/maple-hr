@@ -258,7 +258,6 @@ export default function Requests() {
             </div>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
