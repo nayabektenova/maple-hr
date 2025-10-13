@@ -169,9 +169,34 @@ export default function Requests() {
     }
   };
 
-  const decline = (r: HrRequest, why: string) =>
-    r.status === "pending" &&
-    patch({ ...r, status: "declined", processedAt: new Date().toISOString(), processedBy: "Admin", declineReason: why || undefined });
+  const decline = async (r: HrRequest, why: string) => {
+    if (r.status !== "pending") return;
+
+    const next: HrRequest = {
+      ...r,
+      status: "declined",
+      processedAt: new Date().toISOString(),
+      processedBy: "Admin",
+      declineReason: why || undefined,
+    };
+
+    setRows((prev) => prev.map((x) => (x.id === r.id ? next : x)));
+
+    const { error } = await supabase
+      .from("hr_requests")
+      .update({
+        status: "declined",
+        processed_at: next.processedAt,
+        processed_by: next.processedBy,
+        decline_reason: next.declineReason ?? null,
+      })
+      .eq("id", r.id);
+
+    if (error) {
+      alert(`Decline failed: ${error.message}`);
+      setRows((prev) => prev.map((x) => (x.id === r.id ? r : x)));
+    }
+  };
 
   const reset = () => { seed(); setRows(load()); setQ(""); setTypeFilter(""); setStatusFilter(""); setSel(null); setViewOpen(false); setDeclineOpen(false); setReason(""); };
 
