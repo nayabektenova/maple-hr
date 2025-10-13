@@ -168,6 +168,31 @@ export default function Requests() {
             {list.map((r) => (
               <TableRow key={r.id} className="hover:bg-gray-50">
                 <TableCell className="text-right">
+                  <TableCell className="font-medium">{r.type}</TableCell>
+
+                  <TableCell>
+                    <div className="leading-tight">
+                      <div className="font-medium">{r.employeeName}</div>
+                      <div className="text-xs text-muted-foreground">ID: {r.employeeId}</div>
+                    </div>
+                  </TableCell>
+
+
+                  <TableCell className="text-gray-600">{fmt(r.submittedAt)}</TableCell>
+
+                  <TableCell className="text-gray-700">
+                    {r.type === "Expense" && typeof r.amount === "number"
+                      ? `Amount: $${r.amount.toFixed(2)}`
+                      : r.dateRange
+                      ? `Dates: ${r.dateRange.start} → ${r.dateRange.end}`
+                      : r.notes ?? "—"}
+                  </TableCell>
+
+                  <TableCell>
+                  <StatusBadge s={r.status} />
+                  </TableCell>
+
+
                   <div className="flex items-center justify-end gap-3">
                     {/* View — outline green */}
                     <Button
