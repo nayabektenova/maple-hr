@@ -93,6 +93,9 @@ export default function Requests() {
   const [declineOpen, setDeclineOpen] = React.useState(false);
   const [sel, setSel] = React.useState<HrRequest | null>(null);
   const [reason, setReason] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string | null>(null);
+
 
   React.useEffect(() => {
     const existing = load();
