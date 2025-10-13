@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabaseClient";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
@@ -37,6 +38,38 @@ type HrRequest = {
   processedBy?: string;
   declineReason?: string;
 };
+  type DBRequestRow = {
+    id: string;
+    type: HrType;
+    employee_id: string;
+    employee_name: string;
+    submitted_at: string;
+    date_start: string | null;
+    date_end: string | null;
+    amount: number | null;
+    notes: string | null;
+    status: RequestStatus;
+    processed_at: string | null;
+    processed_by: string | null;
+    decline_reason: string | null;
+    is_demo: boolean | null;
+  };
+
+  const toHr = (r: DBRequestRow): HrRequest => ({
+    id: r.id,
+    type: r.type,
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    submittedAt: r.submitted_at,
+    dateRange: r.date_start || r.date_end ? { start: r.date_start ?? "", end: r.date_end ?? "" } : undefined,
+    amount: r.amount ?? undefined,
+    notes: r.notes ?? undefined,
+    status: r.status,
+    processedAt: r.processed_at ?? undefined,
+    processedBy: r.processed_by ?? undefined,
+    declineReason: r.decline_reason ?? undefined,
+  });
+
 
 const KEY = "maplehr_requests_v3";
 const uid = () => crypto?.randomUUID?.() ?? `id_${Math.random().toString(36).slice(2)}`;
