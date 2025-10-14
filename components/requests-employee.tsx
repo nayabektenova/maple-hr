@@ -159,17 +159,37 @@ export default function RequestsEmployee() {
         Fill out the form below. Your request will be sent for approval and appear in your recent requests list.
       </p>
 
-      {err && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>}
-      {ok && <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">{ok}</div>}
+      {err && (
+        <div
+          className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          role="alert"
+          aria-live="polite"
+        >
+          {err}
+        </div>
+      )}
+      {ok && (
+        <div
+          className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+          role="status"
+          aria-live="polite"
+        >
+          {ok}
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" aria-busy={submitting}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Type</label>
+            <label htmlFor="req-type" className="block text-sm font-medium mb-1">
+              Type
+            </label>
             <select
+              id="req-type"
               className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
               value={type}
               onChange={(e) => setType(e.target.value as HrType)}
+              aria-label="Request type"
             >
               <option value="Leave">Leave</option>
               <option value="Shift Change">Shift Change</option>
@@ -177,15 +197,34 @@ export default function RequestsEmployee() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Employee ID</label>
-            <Input placeholder="e.g., 000957380" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
+            <label htmlFor="emp-id" className="block text-sm font-medium mb-1">
+              Employee ID
+            </label>
+            <Input
+              id="emp-id"
+              placeholder="e.g., 000957380"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              inputMode="numeric"
+              autoComplete="off"
+              pattern="^\d{6,}$"
+              title="Enter at least 6 digits"
+              required
+              aria-invalid={!employeeId.trim() ? true : undefined}
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Employee Name</label>
+            <label htmlFor="emp-name" className="block text-sm font-medium mb-1">
+              Employee Name
+            </label>
             <Input
+              id="emp-name"
               placeholder="e.g., Naya Bektenova"
               value={employeeName}
               onChange={(e) => setEmployeeName(e.target.value)}
+              autoComplete="name"
+              required
+              aria-invalid={!employeeName.trim() ? true : undefined}
             />
           </div>
         </div>
@@ -194,21 +233,29 @@ export default function RequestsEmployee() {
           {type === "Expense" ? (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">Amount (CAD)</label>
+                <label htmlFor="amount" className="block text-sm font-medium mb-1">
+                  Amount (CAD)
+                </label>
                 <Input
+                  id="amount"
                   inputMode="decimal"
                   type="number"
                   step="0.01"
                   placeholder="e.g., 124.56"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  required={type === "Expense"}
+                  aria-invalid={type === "Expense" && !(Number(amount) > 0) ? true : undefined}
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <label htmlFor="notes" className="block text-sm font-medium mb-1">
+                  Notes (optional)
+                </label>
                 <Textarea
+                  id="notes"
                   rows={3}
-                  placeholder="Short description (e.g., 'Conference taxi receipts')"
+                  placeholder="Short description (e.g., “Conference taxi receipts”)"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
@@ -217,18 +264,39 @@ export default function RequestsEmployee() {
           ) : (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">{type === "Shift Change" ? "Date" : "Start date"}</label>
-                <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+                <label htmlFor="date-start" className="block text-sm font-medium mb-1">
+                  {type === "Shift Change" ? "Date" : "Start date"}
+                </label>
+                <Input
+                  id="date-start"
+                  type="date"
+                  value={dateStart}
+                  onChange={(e) => setDateStart(e.target.value)}
+                  required={type !== "Expense"}
+                  aria-invalid={type !== "Expense" && !dateStart ? true : undefined}
+                />
               </div>
               {type === "Leave" && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">End date</label>
-                  <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
+                  <label htmlFor="date-end" className="block text-sm font-medium mb-1">
+                    End date
+                  </label>
+                  <Input
+                    id="date-end"
+                    type="date"
+                    value={dateEnd}
+                    onChange={(e) => setDateEnd(e.target.value)}
+                    required={type === "Leave"}
+                    aria-invalid={type === "Leave" && !dateEnd ? true : undefined}
+                  />
                 </div>
               )}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <label htmlFor="notes2" className="block text-sm font-medium mb-1">
+                  Notes (optional)
+                </label>
                 <Textarea
+                  id="notes2"
                   rows={3}
                   placeholder={type === "Shift Change" ? "Who are you swapping with? Any context…" : "Reason / context…"}
                   value={notes}
@@ -267,7 +335,7 @@ export default function RequestsEmployee() {
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">My Recent Requests</h2>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground" aria-busy={loadingList}>
           {loadingList ? "Loading…" : employeeId ? `Employee ID: ${employeeId}` : "Enter your Employee ID to see your list"}
         </div>
       </div>
@@ -313,7 +381,7 @@ export default function RequestsEmployee() {
       </Table>
 
       <div className="mt-4">
-        <Button type="button" variant="outline" onClick={() => fetchRecent()}>
+        <Button type="button" variant="outline" onClick={() => fetchRecent()} disabled={!employeeId.trim()}>
           Refresh my requests
         </Button>
       </div>
