@@ -75,6 +75,30 @@ export default function RequestsEmployee() {
     setNotes("");
   }
 
+  async function fetchRecent(listForId?: string) {
+    const id = (listForId ?? employeeId).trim();
+    if (!id) return;
+    setLoadingList(true);
+    setErr(null);
+
+    const { data, error } = await supabase
+      .from("hr_requests")
+      .select(
+        `id, type, employee_id, employee_name, submitted_at, date_start, date_end, amount, notes, status, processed_at, processed_by, decline_reason`
+      )
+      .eq("employee_id", id)
+      .order("submitted_at", { ascending: false })
+      .limit(20);
+
+    if (error) {
+      setErr(error.message);
+      setRecent([]);
+    } else {
+      setRecent(data ?? []);
+    }
+    setLoadingList(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
@@ -118,33 +142,10 @@ export default function RequestsEmployee() {
     } else {
       setOk("Your request was submitted. You can track it below.");
       resetForm();
+      await fetchRecent(employeeId);
     }
 
     setSubmitting(false);
-  }
-
-  async function fetchRecent(listForId?: string) {
-    const id = (listForId ?? employeeId).trim();
-    if (!id) return;
-    setLoadingList(true);
-    setErr(null);
-
-    const { data, error } = await supabase
-      .from("hr_requests")
-      .select(
-        `id, type, employee_id, employee_name, submitted_at, date_start, date_end, amount, notes, status, processed_at, processed_by, decline_reason`
-      )
-      .eq("employee_id", id)
-      .order("submitted_at", { ascending: false })
-      .limit(20);
-
-    if (error) {
-      setErr(error.message);
-      setRecent([]);
-    } else {
-      setRecent(data ?? []);
-    }
-    setLoadingList(false);
   }
 
   React.useEffect(() => {
