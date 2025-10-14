@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-
+import { Textarea } from "@/components/ui/textarea";
 
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
@@ -23,6 +23,10 @@ type HrRequestRow = {
   processed_by: string | null;
   decline_reason: string | null;
 };
+const [dateStart, setDateStart] = React.useState("");
+const [dateEnd, setDateEnd] = React.useState("");
+const [amount, setAmount] = React.useState<string>("");
+const [notes, setNotes] = React.useState("");
 
 function fmt(d: string) {
   const t = new Date(d);
@@ -36,41 +40,44 @@ function StatusBadge({ s }: { s: RequestStatus }) {
     </Badge>
   );
 }
-
+function TypeSpecificFields({ type }: { type: HrType }) {
+  if (type === "Expense") {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Amount (CAD)</label>
+          <Input inputMode="decimal" type="number" step="0.01" placeholder="e.g., 124.56"
+            value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+          <Textarea rows={3} placeholder="Short description" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+      </div>
+    );
+  }
+}
 export default function RequestsEmployee() {
   const [type, setType] = React.useState<HrType>("Leave");
   const [employeeId, setEmployeeId] = React.useState("");
   const [employeeName, setEmployeeName] = React.useState("");
 
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-8">
-      {/* ... */}
-      <form className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Type</label>
-            <select
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-              value={type}
-              onChange={(e) => setType(e.target.value as HrType)}
-            >
-              <option value="Leave">Leave</option>
-              <option value="Shift Change">Shift Change</option>
-              <option value="Expense">Expense</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Employee ID</label>
-            <Input placeholder="e.g., 000957380" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Employee Name</label>
-            <Input placeholder="e.g., Naya Bektenova" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} />
-          </div>
+return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">{type === "Shift Change" ? "Date" : "Start date"}</label>
+        <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+      </div>
+      {type === "Leave" && (
+        <div>
+          <label className="block text-sm font-medium mb-1">End date</label>
+          <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
         </div>
-      </form>
+      )}
+      <div className="md:col-span-2">
+        <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+        <Textarea rows={3} placeholder="Reason / context…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
     </div>
   );
 }
