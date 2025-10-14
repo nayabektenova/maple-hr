@@ -1,5 +1,4 @@
-// app/(employee)/requests-employee/page.tsx
-import RequestsEmployee from "@/app/requests-employee";
+import RequestsEmployee from "@/components/requests-employee";
 
 export default function RequestsEmployeePage() {
   return (

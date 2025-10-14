@@ -29,8 +29,8 @@ const navigation = [
   { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
-  { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar }
-
+  { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
+  { name: "My Requests", href: "/requests-employee", icon: FileUser },
 
 ]
 
