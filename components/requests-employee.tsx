@@ -1,4 +1,3 @@
-// app/requests-employee.tsx
 "use client";
 
 import * as React from "react";
@@ -8,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
@@ -34,11 +35,7 @@ function fmt(d: string) {
 }
 
 function StatusBadge({ s }: { s: RequestStatus }) {
-  return (
-    <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>
-      {s}
-    </Badge>
-  );
+  return <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>{s}</Badge>;
 }
 
 export default function RequestsEmployee() {
@@ -119,7 +116,7 @@ export default function RequestsEmployee() {
     if (error) {
       setErr(error.message);
     } else {
-      setOk("Your request was submitted. You can track it on the requests page.");
+      setOk("Your request was submitted. You can track it below.");
       resetForm();
     }
 
@@ -152,7 +149,6 @@ export default function RequestsEmployee() {
 
   React.useEffect(() => {
     if (employeeId) fetchRecent(employeeId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -181,11 +177,7 @@ export default function RequestsEmployee() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Employee ID</label>
-            <Input
-              placeholder="e.g., 000957380"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-            />
+            <Input placeholder="e.g., 000957380" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Employee Name</label>
@@ -224,9 +216,7 @@ export default function RequestsEmployee() {
           ) : (
             <>
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  {type === "Shift Change" ? "Date" : "Start date"}
-                </label>
+                <label className="block text-sm font-medium mb-1">{type === "Shift Change" ? "Date" : "Start date"}</label>
                 <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
               </div>
               {type === "Leave" && (
@@ -271,6 +261,61 @@ export default function RequestsEmployee() {
           </Button>
         </div>
       </form>
+
+      <Separator className="my-8" />
+
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">My Recent Requests</h2>
+        <div className="text-sm text-muted-foreground">
+          {loadingList ? "Loading…" : employeeId ? `Employee ID: ${employeeId}` : "Enter your Employee ID to see your list"}
+        </div>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-40">Type</TableHead>
+            <TableHead className="w-[260px]">Submitted</TableHead>
+            <TableHead>Details</TableHead>
+            <TableHead className="w-28">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {recent.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                {employeeId ? "No requests yet. Submit one above." : "Enter your Employee ID and press “Refresh my requests”."
+                }
+              </TableCell>
+            </TableRow>
+          ) : (
+            recent.map((r) => (
+              <TableRow key={r.id} className="hover:bg-gray-50">
+                <TableCell className="font-medium">{r.type}</TableCell>
+                <TableCell className="text-gray-600">{fmt(r.submitted_at)}</TableCell>
+                <TableCell className="text-gray-700">
+                  {r.type === "Expense" && typeof r.amount === "number"
+                    ? `Amount: $${r.amount.toFixed(2)}${r.notes ? ` — ${r.notes}` : ""}`
+                    : r.date_start && r.date_end
+                    ? r.date_start === r.date_end
+                      ? `Date: ${r.date_start}${r.notes ? ` — ${r.notes}` : ""}`
+                      : `Dates: ${r.date_start} → ${r.date_end}${r.notes ? ` — ${r.notes}` : ""}`
+                    : r.notes ?? "—"}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge s={r.status} />
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      <div className="mt-4">
+        <Button type="button" variant="outline" onClick={() => fetchRecent()}>
+          Refresh my requests
+        </Button>
+      </div>
     </div>
   );
 }
