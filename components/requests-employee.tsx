@@ -1,3 +1,4 @@
+// app/requests-employee.tsx
 "use client";
 
 import * as React from "react";
@@ -11,6 +12,35 @@ import { supabase } from "@/lib/supabaseClient";
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
 
+type HrRequestRow = {
+  id: string;
+  type: HrType;
+  employee_id: string;
+  employee_name: string;
+  submitted_at: string;
+  date_start: string | null;
+  date_end: string | null;
+  amount: number | null;
+  notes: string | null;
+  status: RequestStatus;
+  processed_at: string | null;
+  processed_by: string | null;
+  decline_reason: string | null;
+};
+
+function fmt(d: string) {
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : t.toLocaleString();
+}
+
+function StatusBadge({ s }: { s: RequestStatus }) {
+  return (
+    <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>
+      {s}
+    </Badge>
+  );
+}
+
 export default function RequestsEmployee() {
   const [type, setType] = React.useState<HrType>("Leave");
   const [employeeId, setEmployeeId] = React.useState("");
@@ -22,6 +52,9 @@ export default function RequestsEmployee() {
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
+
+  const [recent, setRecent] = React.useState<HrRequestRow[]>([]);
+  const [loadingList, setLoadingList] = React.useState(false);
 
   const canSubmit = React.useMemo(() => {
     if (!employeeId.trim() || !employeeName.trim()) return false;
@@ -93,60 +126,34 @@ export default function RequestsEmployee() {
     setSubmitting(false);
   }
 
-  function TypeSpecificFields({ type }: { type: HrType }) {
-    if (type === "Expense") {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Amount (CAD)</label>
-            <Input
-              inputMode="decimal"
-              type="number"
-              step="0.01"
-              placeholder="e.g., 124.56"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Notes (optional)</label>
-            <Textarea
-              rows={3}
-              placeholder="Short description (e.g., 'Conference taxi receipts')"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-        </div>
-      );
-    }
+  async function fetchRecent(listForId?: string) {
+    const id = (listForId ?? employeeId).trim();
+    if (!id) return;
+    setLoadingList(true);
+    setErr(null);
 
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {type === "Shift Change" ? "Date" : "Start date"}
-          </label>
-          <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
-        </div>
-        {type === "Leave" && (
-          <div>
-            <label className="block text-sm font-medium mb-1">End date</label>
-            <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
-          </div>
-        )}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">Notes (optional)</label>
-          <Textarea
-            rows={3}
-            placeholder={type === "Shift Change" ? "Who are you swapping with? Any context…" : "Reason / context…"}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-      </div>
-    );
+    const { data, error } = await supabase
+      .from("hr_requests")
+      .select(
+        `id, type, employee_id, employee_name, submitted_at, date_start, date_end, amount, notes, status, processed_at, processed_by, decline_reason`
+      )
+      .eq("employee_id", id)
+      .order("submitted_at", { ascending: false })
+      .limit(20);
+
+    if (error) {
+      setErr(error.message);
+      setRecent([]);
+    } else {
+      setRecent(data ?? []);
+    }
+    setLoadingList(false);
   }
+
+  React.useEffect(() => {
+    if (employeeId) fetchRecent(employeeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-8">
@@ -190,7 +197,56 @@ export default function RequestsEmployee() {
           </div>
         </div>
 
-        <TypeSpecificFields type={type} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {type === "Expense" ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount (CAD)</label>
+                <Input
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g., 124.56"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <Textarea
+                  rows={3}
+                  placeholder="Short description (e.g., 'Conference taxi receipts')"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  {type === "Shift Change" ? "Date" : "Start date"}
+                </label>
+                <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+              </div>
+              {type === "Leave" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">End date</label>
+                  <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
+                </div>
+              )}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                <Textarea
+                  rows={3}
+                  placeholder={type === "Shift Change" ? "Who are you swapping with? Any context…" : "Reason / context…"}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={!canSubmit || submitting} className="inline-flex items-center">
