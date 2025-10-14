@@ -6,59 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-
+import { supabase } from "@/lib/supabaseClient";
 
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
 
-function fmt(d: string) {
-  const t = new Date(d);
-  return isNaN(t.getTime()) ? d : t.toLocaleString();
-}
-
-function StatusBadge({ s }: { s: RequestStatus }) {
-  return (
-    <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>
-      {s}
-    </Badge>
-  );
-}
-
 export default function RequestsEmployee() {
-  
   const [type, setType] = React.useState<HrType>("Leave");
   const [employeeId, setEmployeeId] = React.useState("");
   const [employeeName, setEmployeeName] = React.useState("");
-
-  // Dates (Leave range; Shift Change single day uses start=end)
   const [dateStart, setDateStart] = React.useState("");
   const [dateEnd, setDateEnd] = React.useState("");
-
-  // Expense
   const [amount, setAmount] = React.useState<string>("");
-
-  // Common
   const [notes, setNotes] = React.useState("");
-
   const [submitting, setSubmitting] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
 
   const canSubmit = React.useMemo(() => {
     if (!employeeId.trim() || !employeeName.trim()) return false;
-
     if (type === "Expense") {
       const n = Number(amount);
       return Number.isFinite(n) && n > 0;
     } else {
-      // Leave / Shift Change
       if (!dateStart) return false;
       if (type === "Leave" && !dateEnd) return false;
       return true;
     }
   }, [type, employeeId, employeeName, dateStart, dateEnd, amount]);
 
-  
   function resetForm() {
     if (type === "Expense") {
       setAmount("");
@@ -69,12 +45,52 @@ export default function RequestsEmployee() {
     setNotes("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+
+    setSubmitting(true);
     setErr(null);
-    setOk("Form looks valid. Submission will be wired in the next step.");
- 
+    setOk(null);
+
+    const nowIso = new Date().toISOString();
+    let dStart: string | null = null;
+    let dEnd: string | null = null;
+    let amt: number | null = null;
+
+    if (type === "Expense") {
+      const parsed = Number(amount);
+      amt = Number.isFinite(parsed) ? parsed : null;
+    } else if (type === "Shift Change") {
+      dStart = dateStart || null;
+      dEnd = dateStart || null;
+    } else {
+      dStart = dateStart || null;
+      dEnd = dateEnd || null;
+    }
+
+    const payload = {
+      type,
+      employee_id: employeeId.trim(),
+      employee_name: employeeName.trim(),
+      submitted_at: nowIso,
+      date_start: dStart,
+      date_end: dEnd,
+      amount: amt,
+      notes: notes.trim() || null,
+      status: "pending" as RequestStatus,
+    };
+
+    const { error } = await supabase.from("hr_requests").insert([payload]);
+
+    if (error) {
+      setErr(error.message);
+    } else {
+      setOk("Your request was submitted. You can track it on the requests page.");
+      resetForm();
+    }
+
+    setSubmitting(false);
   }
 
   function TypeSpecificFields({ type }: { type: HrType }) {
@@ -105,7 +121,6 @@ export default function RequestsEmployee() {
       );
     }
 
-    // Leave or Shift Change
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -114,14 +129,12 @@ export default function RequestsEmployee() {
           </label>
           <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
         </div>
-
         {type === "Leave" && (
           <div>
             <label className="block text-sm font-medium mb-1">End date</label>
             <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
           </div>
         )}
-
         <div className="md:col-span-2">
           <label className="block text-sm font-medium mb-1">Notes (optional)</label>
           <Textarea
@@ -142,16 +155,11 @@ export default function RequestsEmployee() {
         Fill out the form below. Your request will be sent for approval and appear in your recent requests list.
       </p>
 
-      {err && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>
-      )}
-      {ok && (
-        <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">{ok}</div>
-      )}
+      {err && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</div>}
+      {ok && <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">{ok}</div>}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Type */}
           <div>
             <label className="block text-sm font-medium mb-1">Type</label>
             <select
@@ -164,8 +172,6 @@ export default function RequestsEmployee() {
               <option value="Expense">Expense</option>
             </select>
           </div>
-
-          {/* Employee ID */}
           <div>
             <label className="block text-sm font-medium mb-1">Employee ID</label>
             <Input
@@ -174,8 +180,6 @@ export default function RequestsEmployee() {
               onChange={(e) => setEmployeeId(e.target.value)}
             />
           </div>
-
-          {/* Employee Name */}
           <div>
             <label className="block text-sm font-medium mb-1">Employee Name</label>
             <Input
@@ -186,16 +190,13 @@ export default function RequestsEmployee() {
           </div>
         </div>
 
-        {/* Type-specific fields */}
         <TypeSpecificFields type={type} />
 
-        {/* Actions */}
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={!canSubmit || submitting} className="inline-flex items-center">
             <Send className="mr-2 h-4 w-4" />
             {submitting ? "Submitting…" : "Submit request"}
           </Button>
-
           <Button
             type="button"
             variant="outline"
