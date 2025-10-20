@@ -148,3 +148,19 @@ create policy "resumes delete"
 on storage.objects for
 delete to authenticated
 using (bucket_id = 'resumes');
+
+
+-- 1) Backfill any existing NULLs (if any)
+update public.resumeai_applicants
+set compatibility = 0
+where compatibility is null;
+
+-- 2) Set a default for future inserts
+alter table public.resumeai_applicants
+  alter column compatibility
+set
+default 0;
+
+-- (Optional) keep NOT NULL (good) — no change needed if it’s already NOT NULL
+-- If it isn't NOT NULL today and you want it:
+-- alter table public.resumeai_applicants alter column compatibility set not null;
