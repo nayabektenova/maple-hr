@@ -98,7 +98,7 @@ export function EmployeeInformation({ employeeId }: EmployeeInformationProps) {
         setError(err.message);
       } else if (!data) {
         setError("Employee not found");
-      } else {
+      } else if (typeof data === "object" && data !== null && "id" in data) {
         setEmployee(data as EmployeeRow);
         setForm(data as EmployeeRow);
       }

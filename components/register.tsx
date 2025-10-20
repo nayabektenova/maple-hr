@@ -39,25 +39,30 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
-
     try {
-      // 1) Create Auth user (email + password)
+      // 1) Create auth user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-
       if (signUpError) throw signUpError;
 
-      // If your project requires email confirmation, signUp sends a confirmation email.
-      // signUpData.user may be present. Get the user id:
-      const userId = signUpData.user?.id;
-      if (!userId) {
-        // In some flows, user might be null (rare). Show message and stop.
-        throw new Error("Failed to create user. Please check your email or try again.");
+      // 2) Try to sign in immediately so a session exists (needed for RLS policies using auth.uid()).
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      // If your project requires email confirmation, sign-in will fail here. Ask user to confirm.
+      if (signInError || !signInData?.user) {
+        alert("Registration successful! Please check your email to confirm your account, then log in.");
+        router.push("/login");
+        return;
       }
 
-      // 2) Insert business details linked to user_id
+      const userId = signInData.user.id;
+
+      // 3) Insert business details after session is active (RLS will pass because auth.uid() = userId)
       const { error: insertError } = await supabase.from("business_details").insert([
         {
           user_id: userId,
@@ -77,24 +82,9 @@ export default function RegisterPage() {
           tax_id: taxId,
         },
       ]);
-
       if (insertError) throw insertError;
 
-      // 3) Try to sign in immediately to create a session (if email confirmation not required)
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        // If confirmation required, sign-in will fail — just show message and ask user to confirm email.
-        console.log("Sign-in after signup error (maybe confirm email required):", signInError.message);
-        alert("Registration successful! Please check your email to confirm your account.");
-        router.push("/login");
-        return;
-      }
-
-      // 4) On success: redirect to dashboard
+      // 4) Go to dashboard
       router.push("/dashboard");
     } catch (err: any) {
       console.error("Registration error:", err);
@@ -118,82 +108,180 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: Personal */}
             <div>
               <h2 className="text-lg font-semibold text-gray-700 mb-4">Personal Details</h2>
+
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Email</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Enter your email" required />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Enter your email"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">First Name</label>
-                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Enter your first name" required />
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Enter your first name"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Last Name</label>
-                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Enter your last name" required />
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Enter your last name"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Username</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Set your username" required />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Set your username"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Password</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Set your password" required />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Set your password"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Confirm your password" required />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Confirm your password"
+                  required
+                />
               </div>
             </div>
 
+            {/* Right: Business */}
             <div>
               <h2 className="text-lg font-semibold text-gray-700 mb-4">Your Business Details</h2>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Business Name</label>
-                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Enter business name" required />
+                <input
+                  type="text"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Enter business name"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Address</label>
-                <input type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Street address" required />
+                <input
+                  type="text"
+                  value={businessAddress}
+                  onChange={(e) => setBusinessAddress(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Street address"
+                  required
+                />
               </div>
 
               <div className="flex gap-3 mb-3">
                 <div className="flex-1">
                   <label className="block text-gray-700 text-sm mb-1">City</label>
-                  <input type="text" value={businessCity} onChange={(e) => setBusinessCity(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="City" required />
+                  <input
+                    type="text"
+                    value={businessCity}
+                    onChange={(e) => setBusinessCity(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                    placeholder="City"
+                    required
+                  />
                 </div>
 
                 <div className="w-1/3">
                   <label className="block text-gray-700 text-sm mb-1">Province</label>
-                  <input type="text" value={businessProvince} onChange={(e) => setBusinessProvince(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Province" required />
+                  <input
+                    type="text"
+                    value={businessProvince}
+                    onChange={(e) => setBusinessProvince(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                    placeholder="Province"
+                    required
+                  />
                 </div>
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Postal Code</label>
-                <input type="text" value={businessPostalCode} onChange={(e) => setBusinessPostalCode(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Postal code" required />
+                <input
+                  type="text"
+                  value={businessPostalCode}
+                  onChange={(e) => setBusinessPostalCode(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Postal code"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Phone</label>
-                <input type="tel" value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Business phone" required />
+                <input
+                  type="tel"
+                  value={businessPhone}
+                  onChange={(e) => setBusinessPhone(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Business phone"
+                  required
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Website</label>
-                <input type="url" value={businessWebsite} onChange={(e) => setBusinessWebsite(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="https://example.com" />
+                <input
+                  type="url"
+                  value={businessWebsite}
+                  onChange={(e) => setBusinessWebsite(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="https://example.com"
+                />
               </div>
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Industry</label>
-                <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" required>
+                <select
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  required
+                >
                   <option value="">Select industry</option>
                   <option value="technology">Technology</option>
                   <option value="healthcare">Healthcare</option>
@@ -206,7 +294,12 @@ export default function RegisterPage() {
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Number of Employees</label>
-                <select value={numberOfEmployees} onChange={(e) => setNumberOfEmployees(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" required>
+                <select
+                  value={numberOfEmployees}
+                  onChange={(e) => setNumberOfEmployees(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  required
+                >
                   <option value="">Select</option>
                   <option value="1-5">1-5</option>
                   <option value="6-20">6-20</option>
@@ -218,13 +311,23 @@ export default function RegisterPage() {
 
               <div className="mb-3">
                 <label className="block text-gray-700 text-sm mb-1">Tax ID / Business Registration No.</label>
-                <input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black" placeholder="Tax ID or registration number" />
+                <input
+                  type="text"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-black"
+                  placeholder="Tax ID or registration number"
+                />
               </div>
             </div>
           </div>
 
           <div>
-            <button type="submit" disabled={loading} className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+            >
               {loading ? "Creating account..." : "Create Your Account"}
             </button>
           </div>
