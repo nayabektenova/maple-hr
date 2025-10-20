@@ -112,3 +112,39 @@ create policy "resumes delete"
 on storage.objects for
 delete to authenticated
 using (bucket_id = 'resumes');
+
+
+-- Drop the existing one first, then re-create
+drop policy
+if exists "resumes read" on storage.objects;
+drop policy
+if exists "resumes write" on storage.objects;
+drop policy
+if exists "resumes update" on storage.objects;
+drop policy
+if exists "resumes delete" on storage.objects;
+
+create policy "resumes read"
+on storage.objects for
+select to authenticated
+using
+(bucket_id = 'resumes');
+
+create policy "resumes write"
+on storage.objects for
+insert to authenticated
+with check (
+bucket_id
+=
+'resumes'
+);
+
+create policy "resumes update"
+on storage.objects for
+update to authenticated
+using (bucket_id = 'resumes');
+
+create policy "resumes delete"
+on storage.objects for
+delete to authenticated
+using (bucket_id = 'resumes');
