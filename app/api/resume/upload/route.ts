@@ -1,15 +1,22 @@
 // app/api/resume/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
-import pdf from "pdf-parse";
-import mammoth from "mammoth";
 
-export const runtime = "nodejs"; // OK now that "use server" is removed
+export const runtime = "nodejs"; // ensure Node (not Edge)
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
 
   try {
+    // Dynamically import CJS libs to avoid bundling issues
+    const pdfParse = (await import("pdf-parse")).default as (b: Buffer) => Promise<{ text: string }>;
+    const mammothMod = await import("mammoth");
+    // mammoth may export under default or named depending on bundler
+    const extractRawText =
+      // @ts-ignore
+      (mammothMod?.default?.extractRawText as ((args: { buffer: Buffer }) => Promise<{ value: string }>)) ||
+      (mammothMod as any).extractRawText;
+
     // 1) Parse multipart/form-data
     const form = await req.formData();
     const file = form.get("file") as File | null;
@@ -17,10 +24,7 @@ export async function POST(req: NextRequest) {
     const applicantId = String(form.get("applicantId") || "");
 
     if (!file || !jobIdRaw || !applicantId) {
-      return NextResponse.json(
-        { error: "Missing file, jobId or applicantId" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing file, jobId or applicantId" }, { status: 400 });
     }
 
     const jobId = Number(jobIdRaw);
@@ -32,10 +36,7 @@ export async function POST(req: NextRequest) {
     const maxBytes = 10 * 1024 * 1024; // 10 MB
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.byteLength > maxBytes) {
-      return NextResponse.json(
-        { error: "File too large (max 10 MB)" },
-        { status: 413 }
-      );
+      return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 413 });
     }
 
     const name = (file.name || "resume").toLowerCase();
@@ -45,11 +46,11 @@ export async function POST(req: NextRequest) {
     let resumeText = "";
     try {
       if (name.endsWith(".pdf") || mime === "application/pdf") {
-        const parsed = await pdf(buf);
-        resumeText = (parsed.text || "").trim();
+        const parsed = await pdfParse(buf);
+        resumeText = (parsed?.text || "").trim();
       } else if (name.endsWith(".docx")) {
-        const parsed = await mammoth.extractRawText({ buffer: buf });
-        resumeText = (parsed.value || "").trim();
+        const parsed = await extractRawText({ buffer: buf });
+        resumeText = (parsed?.value || "").trim();
       } else if (name.endsWith(".txt") || mime.startsWith("text/")) {
         resumeText = buf.toString("utf8").trim();
       } else {
