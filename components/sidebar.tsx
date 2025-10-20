@@ -12,6 +12,7 @@ import {
   DollarSign,
   MessageSquare,
   FileIcon as FileUser,
+  ClipboardList,
 } from "lucide-react"
 
 const navigation = [
@@ -30,7 +31,7 @@ const navigation = [
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
-  { name: "My Requests", href: "/requests-employee", icon: FileUser },
+  { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
 
 ]
 
