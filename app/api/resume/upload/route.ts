@@ -1,12 +1,10 @@
 // app/api/resume/upload/route.ts
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import pdf from "pdf-parse";
 import mammoth from "mammoth";
 
-export const runtime = "nodejs"; // Required because pdf-parse & mammoth need Node APIs
+export const runtime = "nodejs"; // OK now that "use server" is removed
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
@@ -30,8 +28,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid jobId" }, { status: 400 });
     }
 
-    // 2) Validate file size
-    const maxBytes = 10 * 1024 * 1024; // 10 MB limit
+    // 2) Validate & buffer
+    const maxBytes = 10 * 1024 * 1024; // 10 MB
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.byteLength > maxBytes) {
       return NextResponse.json(
@@ -43,7 +41,7 @@ export async function POST(req: NextRequest) {
     const name = (file.name || "resume").toLowerCase();
     const mime = file.type || "application/octet-stream";
 
-    // 3) Extract plain text
+    // 3) Extract plain text (PDF/DOCX/TXT)
     let resumeText = "";
     try {
       if (name.endsWith(".pdf") || mime === "application/pdf") {
@@ -67,10 +65,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Non-OCR PDFs will yield empty text; fine for MVP
+    // Non-OCR PDFs can be empty; that's OK for MVP
     if (!resumeText) resumeText = "";
 
-    // 4) Upload to Storage bucket “resumes”
+    // 4) Upload to private Storage bucket 'resumes'
     const path = `resumes/${jobId}/${applicantId}/${Date.now()}-${name}`;
     const { error: uploadError } = await supabase.storage
       .from("resumes")
