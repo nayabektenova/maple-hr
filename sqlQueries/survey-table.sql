@@ -13,6 +13,6 @@ CREATE TABLE questions (
     question_id SERIAL PRIMARY KEY,
     survey_id INT ,
     question_type VARCHAR(100),
-    question_title TEXT NOT NULL,
+    question_title TEXT ,
     FOREIGN KEY (survey_id) REFERENCES survey(survey_id) ON DELETE CASCADE
 );
