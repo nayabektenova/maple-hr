@@ -1,3 +1,6 @@
+/* AI-assisted: Parts of this file were generated with AI and then edited by me. I reviewed and tested all changes.
+Prompt: "Add an employee self-submit requests page wired to Supabase, also check for possible enchnces in the exicsting code." */
+
 "use client";
 
 import * as React from "react";
@@ -135,11 +138,16 @@ export default function RequestsEmployee() {
       status: "pending" as RequestStatus,
     };
 
-    const { error } = await supabase.from("hr_requests").insert([payload]);
+    const { data, error } = await supabase
+      .from("hr_requests")
+      .insert([payload])
+      .select()
+      .single();
 
     if (error) {
       setErr(error.message);
     } else {
+      if (data) setRecent((prev) => [data as HrRequestRow, ...prev]);
       setOk("Your request was submitted. You can track it below.");
       resetForm();
       await fetchRecent(employeeId);
@@ -149,8 +157,29 @@ export default function RequestsEmployee() {
   }
 
   React.useEffect(() => {
-    if (employeeId) fetchRecent(employeeId);
+    try {
+      const savedId = localStorage.getItem("employeeId");
+      if (savedId) setEmployeeId(savedId);
+      const savedName = localStorage.getItem("employeeName");
+      if (savedName) setEmployeeName(savedName);
+    } catch {}
   }, []);
+
+  React.useEffect(() => {
+    try {
+      if (employeeId) localStorage.setItem("employeeId", employeeId);
+    } catch {}
+  }, [employeeId]);
+
+  React.useEffect(() => {
+    try {
+      if (employeeName) localStorage.setItem("employeeName", employeeName);
+    } catch {}
+  }, [employeeName]);
+
+  React.useEffect(() => {
+    if (employeeId.trim()) fetchRecent(employeeId);
+  }, [employeeId]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-8">
