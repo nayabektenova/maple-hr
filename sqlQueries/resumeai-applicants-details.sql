@@ -164,3 +164,9 @@ default 0;
 -- (Optional) keep NOT NULL (good) — no change needed if it’s already NOT NULL
 -- If it isn't NOT NULL today and you want it:
 -- alter table public.resumeai_applicants alter column compatibility set not null;
+
+
+insert into public.resumeai_applicants
+    (id, job_id, full_name, job_title, status, created_at, compatibility)
+values
+    (gen_random_uuid(), 101, 'Test Candidate', 'Frontend Engineer', 'View', now(), 0);
