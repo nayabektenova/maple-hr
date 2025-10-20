@@ -81,6 +81,9 @@ const rowsSeed: SurveyRow[] = [
   { id: "4", firstName: "Henrietta",lastName: "Gibbs",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
   { id: "5", firstName: "Enzo",     lastName: "Cobb",     survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
   { id: "6", firstName: "Fintan",   lastName: "Huff",     survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
+  { id: "7", firstName: "Lena",     lastName: "Dixon",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
+  { id: "8", firstName: "Cole",     lastName: "Stanton",  survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
+  { id: "9", firstName: "Cole",     lastName: "Stanton",  survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
 ]
 
 const SURVEY_TYPES: Array<SurveyRow["survey"]> = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
