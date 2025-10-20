@@ -2,20 +2,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
-export const runtime = "nodejs"; // ensure Node (not Edge)
+export const runtime = "nodejs"; // pdf-parse & mammoth need Node runtime
+
+// Helpful message for accidental GETs (e.g., opening the URL directly)
+export async function GET() {
+  return NextResponse.json(
+    { error: "Use POST with multipart/form-data (file, jobId, applicantId)" },
+    { status: 405 }
+  );
+}
 
 export async function POST(req: NextRequest) {
   const supabase = supabaseServer();
 
   try {
-    // Dynamically import CJS libs to avoid bundling issues
-    const pdfParse = (await import("pdf-parse")).default as (b: Buffer) => Promise<{ text: string }>;
-    const mammothMod = await import("mammoth");
-    // mammoth may export under default or named depending on bundler
-    const extractRawText =
-      // @ts-ignore
-      (mammothMod?.default?.extractRawText as ((args: { buffer: Buffer }) => Promise<{ value: string }>)) ||
-      (mammothMod as any).extractRawText;
+    // Dynamically import CJS libs to avoid bundling/interop issues
+    const pdfParse = (await import("pdf-parse")).default as (
+      b: Buffer
+    ) => Promise<{ text: string }>;
+    const mammothMod: any = await import("mammoth");
+    const extractRawText: (args: { buffer: Buffer }) => Promise<{ value: string }> =
+      mammothMod?.default?.extractRawText || mammothMod?.extractRawText;
 
     // 1) Parse multipart/form-data
     const form = await req.formData();
@@ -24,7 +31,10 @@ export async function POST(req: NextRequest) {
     const applicantId = String(form.get("applicantId") || "");
 
     if (!file || !jobIdRaw || !applicantId) {
-      return NextResponse.json({ error: "Missing file, jobId or applicantId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing file, jobId or applicantId" },
+        { status: 400 }
+      );
     }
 
     const jobId = Number(jobIdRaw);
@@ -36,22 +46,25 @@ export async function POST(req: NextRequest) {
     const maxBytes = 10 * 1024 * 1024; // 10 MB
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.byteLength > maxBytes) {
-      return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 413 });
+      return NextResponse.json(
+        { error: "File too large (max 10 MB)" },
+        { status: 413 }
+      );
     }
 
-    const name = (file.name || "resume").toLowerCase();
+    const originalName = (file.name || "resume").toLowerCase();
     const mime = file.type || "application/octet-stream";
 
     // 3) Extract plain text (PDF/DOCX/TXT)
     let resumeText = "";
     try {
-      if (name.endsWith(".pdf") || mime === "application/pdf") {
+      if (originalName.endsWith(".pdf") || mime === "application/pdf") {
         const parsed = await pdfParse(buf);
         resumeText = (parsed?.text || "").trim();
-      } else if (name.endsWith(".docx")) {
+      } else if (originalName.endsWith(".docx")) {
         const parsed = await extractRawText({ buffer: buf });
         resumeText = (parsed?.value || "").trim();
-      } else if (name.endsWith(".txt") || mime.startsWith("text/")) {
+      } else if (originalName.endsWith(".txt") || mime.startsWith("text/")) {
         resumeText = buf.toString("utf8").trim();
       } else {
         return NextResponse.json(
@@ -60,17 +73,20 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch (err: any) {
+      console.error("Text extraction failed:", err);
       return NextResponse.json(
         { error: `Failed to extract text: ${err?.message ?? err}` },
         { status: 500 }
       );
     }
 
-    // Non-OCR PDFs can be empty; that's OK for MVP
+    // Non-OCR PDFs may yield empty text; acceptable for MVP
     if (!resumeText) resumeText = "";
 
-    // 4) Upload to private Storage bucket 'resumes'
-    const path = `resumes/${jobId}/${applicantId}/${Date.now()}-${name}`;
+    // 4) Upload file to private Storage bucket 'resumes'
+    const safeName = originalName.replace(/[^\w.\-+]+/g, "_");
+    const path = `resumes/${jobId}/${applicantId}/${Date.now()}-${safeName}`;
+
     const { error: uploadError } = await supabase.storage
       .from("resumes")
       .upload(path, buf, { contentType: mime, upsert: true });
