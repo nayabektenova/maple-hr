@@ -1,5 +1,5 @@
 "use client"
-// these are the same as in components/finances-overview.tsx these are all done by naya
+
 import { useMemo, useState } from "react"
 import { Search, Filter, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -33,16 +33,21 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { createClient } from "@supabase/supabase-js"
+
+/* ======================== Supabase Client ======================== */
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 /* ======================== Types ======================== */
-
 type SurveyRow = {
   id: string
   firstName: string
   lastName: string
   survey: "Team Satisfaction" | "Manager feedback" | "Improvement Suggestions" | string
   status: "Submitted" | "Pending" | "In progress"
-  submissionDate: string // DD/MM/YYYY or "Pending"
+  submissionDate: string
   reviewStatus: "Reviewed" | "Pending" | "Pending Review"
   notes?: string
 }
@@ -53,7 +58,7 @@ type Question = {
   id: string
   type: QuestionType
   prompt: string
-  options?: string[] // for multi_choice
+  options?: string[]
 }
 
 type SurveyDraft = {
@@ -62,60 +67,39 @@ type SurveyDraft = {
   description?: string
   audience: "all" | "department" | "individuals"
   department?: string
-  employees?: string[] // ids/emails
-  dueDate?: string // YYYY-MM-DD
+  employees?: string[]
+  dueDate?: string
   questions: Question[]
   status: "draft" | "published"
 }
 
-/* ======================== Demo data (submissions list) ======================== */
-
+/* ======================== Demo data ======================== */
 const rowsSeed: SurveyRow[] = [
-  { id: "1", firstName: "Saul",     lastName: "Mullins",  survey: "Team Satisfaction",        status: "Submitted",  submissionDate: "03/07/2025", reviewStatus: "Reviewed" },
-  { id: "2", firstName: "Amirah",   lastName: "Vincent",  survey: "Manager feedback",         status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending", notes: "On vacation" },
-  { id: "3", firstName: "Morgan",   lastName: "Terrell",  survey: "Improvement Suggestions",  status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "4", firstName: "Henrietta",lastName: "Gibbs",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
-  { id: "5", firstName: "Enzo",     lastName: "Cobb",     survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "6", firstName: "Fintan",   lastName: "Huff",     survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "7", firstName: "Lena",     lastName: "Dixon",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
-  { id: "8", firstName: "Cole",     lastName: "Stanton",  survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "9", firstName: "Cole",     lastName: "Stanton",  survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
+  { id: "1", firstName: "Saul", lastName: "Mullins", survey: "Team Satisfaction", status: "Submitted", submissionDate: "03/07/2025", reviewStatus: "Reviewed" },
+  { id: "2", firstName: "Amirah", lastName: "Vincent", survey: "Manager feedback", status: "Pending", submissionDate: "Pending", reviewStatus: "Pending", notes: "On vacation" },
+  { id: "3", firstName: "Morgan", lastName: "Terrell", survey: "Improvement Suggestions", status: "In progress", submissionDate: "Pending", reviewStatus: "Pending" },
 ]
 
-const SURVEY_TYPES: Array<SurveyRow["survey"]> = [
-  "Team Satisfaction",
-  "Manager feedback",
-  "Improvement Suggestions",
-]
+const SURVEY_TYPES: Array<SurveyRow["survey"]> = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
 const STATUSES: SurveyRow["status"][] = ["Submitted", "Pending", "In progress"]
 const REVIEW_STATUSES: SurveyRow["reviewStatus"][] = ["Reviewed", "Pending", "Pending Review"]
 
-const DEPARTMENTS = [
-  "Development",
-  "Marketing",
-  "Finance",
-  "Administration",
-  "Maintenance",
-  "Cybersecurity",
-]
+const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
 
 /* ======================== Component ======================== */
-
 export function SurveyList() {
-  // list view state
   const [search, setSearch] = useState("")
   const [surveyFilter, setSurveyFilter] = useState<SurveyRow["survey"] | "">("")
   const [statusFilter, setStatusFilter] = useState<SurveyRow["status"] | "">("")
   const [reviewFilter, setReviewFilter] = useState<SurveyRow["reviewStatus"] | "">("")
   const [rows] = useState<SurveyRow[]>(rowsSeed)
 
-  // catalog (newly created surveys live here)
   const [surveysCatalog, setSurveysCatalog] = useState<SurveyDraft[]>([])
   const [showCreatedBanner, setShowCreatedBanner] = useState<{id: string; name: string} | null>(null)
 
-  // creation dialog state
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<SurveyDraft>(() => blankDraft())
+  const [loading, setLoading] = useState(false)
 
   function blankDraft(): SurveyDraft {
     return {
@@ -146,15 +130,10 @@ export function SurveyList() {
     })
   }, [rows, search, surveyFilter, statusFilter, reviewFilter])
 
-  /* ------------- Create Survey handlers ------------- */
-
   function addQuestion() {
     setDraft((d) => ({
       ...d,
-      questions: [
-        ...d.questions,
-        { id: cryptoRandomId(), type: "short_text", prompt: "" },
-      ],
+      questions: [...d.questions, { id: cryptoRandomId(), type: "short_text", prompt: "" }],
     }))
   }
 
@@ -173,7 +152,6 @@ export function SurveyList() {
     setDraft((d) => ({
       ...d,
       audience: a,
-      // clear conditional fields when audience changes
       department: a === "department" ? d.department : "",
       employees: a === "individuals" ? d.employees : [],
     }))
@@ -182,42 +160,77 @@ export function SurveyList() {
   function saveDraft() {
     const entry = { ...draft, status: "draft" as const }
     setSurveysCatalog((prev) => {
-      // replace if same id exists (editing)
       const i = prev.findIndex((s) => s.id === entry.id)
       if (i >= 0) {
         const copy = [...prev]; copy[i] = entry; return copy
       }
       return [entry, ...prev]
     })
-    // reset for next
     setDraft(blankDraft())
     setOpen(false)
   }
 
-  function createAndPublish() {
-    const entry = { ...draft, status: "published" as const }
-    setSurveysCatalog((prev) => {
-      const i = prev.findIndex((s) => s.id === entry.id)
-      const next = i >= 0 ? (prev.map((s) => (s.id === entry.id ? entry : s))) : [entry, ...prev]
-      return next
-    })
-    setShowCreatedBanner({ id: entry.id, name: entry.name || "Untitled survey" })
-    // Here’s where you’d POST `entry` to your API.
-    setDraft(blankDraft())
-    setOpen(false)
-    // hide banner after a few seconds
-    setTimeout(() => setShowCreatedBanner(null), 4000)
+  /* ================== CREATE & PUBLISH with Supabase ================== */
+  async function createAndPublish() {
+    setLoading(true)
+    try {
+      // 1️⃣ Insert survey into Survey table
+      const { data: surveyData, error: surveyError } = await supabase
+        .from("survey")
+        .insert([{
+          survey_name: draft.name,
+          description: draft.description,
+          due_date: draft.dueDate || null,
+          audience: draft.audience,
+        }])
+        .select("survey_id")
+        .single()
+
+      if (surveyError) throw surveyError
+      const surveyId = surveyData.survey_id
+
+      // 2️⃣ Insert related questions into Questions table
+      if (draft.questions.length > 0) {
+        const questionInserts = draft.questions.map((q) => ({
+          survey_id: surveyId,
+          question_type: q.type,
+          question_title: q.prompt,
+        }))
+
+        const { error: questionsError } = await supabase
+          .from("questions")
+          .insert(questionInserts)
+
+        if (questionsError) throw questionsError
+      }
+
+      // 3️⃣ Update local state & show success banner
+      const entry = { ...draft, status: "published" as const }
+      setSurveysCatalog((prev) => {
+        const i = prev.findIndex((s) => s.id === entry.id)
+        const next = i >= 0 ? prev.map((s) => (s.id === entry.id ? entry : s)) : [entry, ...prev]
+        return next
+      })
+      setShowCreatedBanner({ id: entry.id, name: entry.name || "Untitled survey" })
+      setDraft(blankDraft())
+      setOpen(false)
+      setTimeout(() => setShowCreatedBanner(null), 4000)
+    } catch (err) {
+      console.error("Error publishing survey:", err)
+      alert("Failed to publish survey. Check console for details.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   /* ======================== Render ======================== */
-
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       {/* Header (search + filters + Create survey) */}
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         {showCreatedBanner && (
           <div className="mb-2 rounded-md border border-green-200 bg-green-50 text-green-800 px-3 py-2 text-sm">
-            <strong>{showCreatedBanner.name}</strong> has been published. Respondents will receive it shortly.
+            <strong>{showCreatedBanner.name}</strong> has been published and saved to the database.
           </div>
         )}
 
@@ -232,15 +245,12 @@ export function SurveyList() {
             />
           </div>
 
-          {/* Filters dropdown */}
+          {/* Filters */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
                 <Filter className="h-4 w-4" />
                 Filters
-                {surveyFilter ? `: ${surveyFilter}` : ""}
-                {statusFilter ? ` • ${statusFilter}` : ""}
-                {reviewFilter ? ` • ${reviewFilter}` : ""}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-72">
@@ -271,19 +281,13 @@ export function SurveyList() {
               ))}
 
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  setSurveyFilter("")
-                  setStatusFilter("")
-                  setReviewFilter("")
-                }}
-              >
+              <DropdownMenuItem onClick={() => { setSurveyFilter(""); setStatusFilter(""); setReviewFilter("") }}>
                 Clear filters
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Right-aligned Create survey */}
+          {/* Create survey */}
           <div className="ml-auto">
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
@@ -377,7 +381,7 @@ export function SurveyList() {
                     )}
                   </div>
 
-                  {/* Questions builder */}
+                  {/* Questions */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <Label>Questions</Label>
@@ -427,7 +431,6 @@ export function SurveyList() {
                             </Button>
                           </div>
 
-                          {/* Options editor for multiple choice */}
                           {q.type === "multi_choice" && (
                             <div className="mt-3 space-y-2">
                               {(q.options ?? []).map((opt, i) => (
@@ -456,9 +459,9 @@ export function SurveyList() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateQuestion(q.id, { options: [ ...(q.options ?? []), `Option ${(q.options?.length ?? 0) + 1}` ] })}
+                                onClick={() => updateQuestion(q.id, { options: [...(q.options ?? []), "New option"] })}
                               >
-                                Add option
+                                + Add option
                               </Button>
                             </div>
                           )}
@@ -468,10 +471,10 @@ export function SurveyList() {
                   </div>
                 </div>
 
-                <DialogFooter className="gap-2">
+                <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={saveDraft}>Save draft</Button>
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish}>
-                    Create & publish
+                  <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish} disabled={loading}>
+                    {loading ? "Publishing..." : "Create & publish"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -480,61 +483,43 @@ export function SurveyList() {
         </div>
       </div>
 
-      {/* Submissions Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Employee</TableHead>
-            <TableHead>Survey Name</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Submission Date</TableHead>
-            <TableHead>Review status</TableHead>
-            <TableHead>Notes</TableHead>
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {visibleRows.map((r) => (
-            <TableRow key={r.id} className="hover:bg-gray-50">
-              <TableCell className="font-medium">
-                <div className="font-medium">{r.firstName}</div>
-                <div className="text-gray-600">{r.lastName}</div>
-              </TableCell>
-              <TableCell className="text-gray-700">{r.survey}</TableCell>
-              <TableCell className={cn("text-gray-700")}>{r.status}</TableCell>
-              <TableCell className="text-gray-600">{r.submissionDate}</TableCell>
-              <TableCell className="text-gray-700">{r.reviewStatus}</TableCell>
-              <TableCell className="text-gray-600">{r.notes ?? ""}</TableCell>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Survey</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Submission Date</TableHead>
+              <TableHead>Review Status</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      {/* (Optional) simple catalog readout for visibility during dev.
-          You can remove this block later, or turn it into its own page. */}
-      {surveysCatalog.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 text-sm text-gray-600">
-          <div className="mb-2 font-medium text-gray-800">Created surveys (local):</div>
-          <ul className="list-disc pl-5 space-y-1">
-            {surveysCatalog.map((s) => (
-              <li key={s.id}>
-                <span className="font-medium">{s.name || "Untitled"}</span> — {s.status}
-                {s.audience === "department" && s.department ? ` • Dept: ${s.department}` : ""}
-                {s.audience === "individuals" && s.employees?.length ? ` • ${s.employees.length} recipients` : ""}
-                {s.dueDate ? ` • Due ${s.dueDate}` : ""}
-                {` • ${s.questions.length} question${s.questions.length === 1 ? "" : "s"}`}
-              </li>
+          </TableHeader>
+          <TableBody>
+            {visibleRows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>{row.id}</TableCell>
+                <TableCell>{row.firstName} {row.lastName}</TableCell>
+                <TableCell>{row.survey}</TableCell>
+                <TableCell>{row.status}</TableCell>
+                <TableCell>{row.submissionDate}</TableCell>
+                <TableCell>{row.reviewStatus}</TableCell>
+              </TableRow>
             ))}
-          </ul>
-        </div>
-      )}
+            {visibleRows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-gray-500 py-8">No results</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }
 
-/* ======================== Utils ======================== */
+/* ======================== Helpers ======================== */
 function cryptoRandomId() {
-  // small random id for client-side objects
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
-  return "id-" + Math.random().toString(36).slice(2, 10)
+  return Math.random().toString(36).slice(2)
 }
