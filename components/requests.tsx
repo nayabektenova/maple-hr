@@ -1,4 +1,10 @@
+<<<<<<< Updated upstream
 // components/requests.tsx
+=======
+/* AI-assisted: Parts of this file were generated with AI and then edited by me. I reviewed and tested all changes.
+Prompt: "hr requests page: supabase select+update; search/filter; view/approve/decline; demo seed+reset. keep it simple." */
+
+>>>>>>> Stashed changes
 "use client";
 
 import * as React from "react";
