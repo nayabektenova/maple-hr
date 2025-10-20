@@ -12,6 +12,8 @@ import {
   DollarSign,
   MessageSquare,
   FileIcon as FileUser,
+  ClipboardList,
+  Sparkles,
 } from "lucide-react"
 
 const navigation = [
@@ -23,14 +25,14 @@ const navigation = [
   { name: "Leaves", href: "/leaves", icon: Plane },
   { name: "Finances", href: "/finances", icon: DollarSign },
   { name: "Survey", href: "/survey", icon: MessageSquare },
-  { name: "Resume AI", href: "/resume-ai", icon: FileUser },
-  { name: "Requests", href: "/admin/requests", icon: FileUser },
+  { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
+  { name: "Requests", href: "/admin/requests", icon: ClipboardList },
   { name: "Employee List", href: "/admin/viewemployee", icon: FileUser },
   { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
-  { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar }
-
+  { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
+  { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
 
 ]
 

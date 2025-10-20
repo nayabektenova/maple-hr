@@ -1,86 +1,19 @@
-"use client"
+// app/resume-ai/[jobId]/applicant/[id]/page.tsx
+"use client";
 
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabaseClient";
 
-/* ----- One sample resume & scan that we’ll show for everyone ----- */
-const RESUME_SAMPLE = `FIRST LAST
-Bay Area, California • +1-234-456-789 • professionalemail@resumeworded.com • linkedin.com/in/username
-
-Software Engineer with over six years of experience in full-stack development and leading product
-cycle from conception to completion. Guided a team of 5–15 members through 5+ product launches
-at a recent experience in a high growth technology startup.
-
-PROFESSIONAL EXPERIENCE
-Resume Worded, New York, NY                                   2020 – Present
-Software Engineer
-• Created an invoicing system for subscription services that managed monthly invoices and
-  printed invoices to be sent to customers; increased conversion rate by 15%.
-• Collaborated with internal teams, including graphic design and QA testers to develop and
-  launch a new application in just 6 months, ahead of schedule by 6 months.
-• Wrote reusable unit test documents to ensure quality control and detect bugs by increasing
-  over 35% efficiency rate.
-
-GrowthX, San Diego, CA                                        2016 – 2020
-Software Engineer
-• Analyzed information to determine, recommend and plan redesign of a new API; presented
-  outputs to CTO.
-• Analyzed user needs and software requirements to determine feasibility of design, ensuring
-  project completion 3 weeks prior to targeted due date.
-• Released and updated 15+ custom .net applications for company clients in health niches.
-• Wrote Python and JavaScript libraries to display real time pricing via SkyScanner’s flights
-  pricing API, leading to increased customer satisfaction.
-• Tip to jobseeker: Bullet points should be in format {Action Verb} {Accomplishment} {Metric};
-  e.g. Developed X that led to Y% improvement
-
-Rofocus, New York, NY                                         2012 – 2016
-Front-end Developer
-• Implemented a new responsive website approach increasing mobile traffic by 22%.
-• Partnered with back-end developers and created dynamic web pages using JavaScript,
-  resulting in website leads increase by 15%.
-• Integrated an A/B testing and managed software workflow using Scrum methodology,
-  increasing task success rate by 25%.
-• Tip to jobseeker: Bullet points should be in format {Action Verb} {Accomplishment} {Metric};
-  e.g. Developed X that led to Y% improvement
-
-EDUCATION
-Resume Worded University, San Francisco, CA                    2012
-Bachelor of Electrical Engineering
-• Awards: Resume Worded Teaching Fellow (only 5 awarded to class), Dean’s List 2012 (Top 10%)
-• Completed one-year study abroad with Singapore University
-
-SKILLS & OTHER
-Skills: CSS, JavaScript, Python, Advanced SAP, HTML and XML, Scrum Methodology, Database
-management software, Software Development Life Cycle
-Volunteering: Volunteer as Junior Developer in iOS hotel booking application launch project for 3-
-months (2020).
-`
-
-const SAMPLE_DETAIL = {
-  name: "Hana Takahashi",
-  jobTitle: "Software Engineer I",
-  resumeText: RESUME_SAMPLE,
-  scan: {
-    matchRate: 65,
-    metrics: [
-      { label: "Experience Alignment", value: 45 },
-      { label: "Certification Fit", value: 70 },
-      { label: "Education Match", value: 80 },
-      { label: "Predicted Interview Score", value: 65 },
-      { label: "Hard Skills", value: 45 },
-      { label: "Seniority Fit", value: 35 },
-    ],
-  },
-}
-
-/* ----- Tiny SVG donut for the match rate ----- */
+/* ---------- Tiny SVG donut for the match rate ---------- */
 function Donut({ percent }: { percent: number }) {
-  const radius = 64
-  const stroke = 12
-  const c = 2 * Math.PI * radius
-  const dash = (percent / 100) * c
+  const radius = 64;
+  const stroke = 12;
+  const c = 2 * Math.PI * radius;
+  const dash = (Math.max(0, Math.min(100, percent)) / 100) * c;
   return (
     <svg width="180" height="180" viewBox="0 0 180 180" className="mx-auto">
       <circle cx="90" cy="90" r={radius} fill="none" stroke="#E5E7EB" strokeWidth={stroke} />
@@ -99,25 +32,194 @@ function Donut({ percent }: { percent: number }) {
         {Math.round(percent)}%
       </text>
     </svg>
-  )
+  );
 }
 
-export function ResumeAIApplicantDetail() {
-  const params = useParams<{ jobId: string }>()
-  const jobId = params?.jobId
+/* ---------- Types ---------- */
+type MatchRow = { match_rate: number; metrics: Record<string, number> };
+type ApplicantRow = {
+  id: string;
+  job_id: string | number; // bigint may come back as string
+  full_name: string | null;
+  job_title: string | null;
+  resume_text: string | null;
+  decision: "Approved" | "Declined" | null;
+  status: "View" | "Viewed" | null;
+};
+type OpeningRow = { title: string | null };
 
-  const data = SAMPLE_DETAIL // <-- same detail for everyone
+/* ---------- Page ---------- */
+export default function ResumeAIApplicantDetailPage() {
+  const { jobId: jobIdParam, id: applicantId } = useParams<{ jobId: string; id: string }>();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [savingDecision, setSavingDecision] = useState<null | "Approved" | "Declined">(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [resumeText, setResumeText] = useState("");
+  const [match, setMatch] = useState<MatchRow | null>(null);
+
+  const jobIdNum = useMemo(() => Number(jobIdParam), [jobIdParam]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      // 1) Load applicant
+      const { data: app, error: aErr } = await supabase
+        .from("resumeai_applicants")
+        .select("id, job_id, full_name, job_title, resume_text, decision, status")
+        .eq("id", applicantId)
+        .maybeSingle<ApplicantRow>();
+
+      if (!mounted) return;
+
+      if (aErr || !app) {
+        setErr(aErr?.message || "Applicant not found");
+        setLoading(false);
+        return;
+      }
+
+      const actualJobId = Number(app.job_id);
+      if (!Number.isFinite(actualJobId) || actualJobId !== jobIdNum) {
+        // If route jobId and record job_id disagree, prefer DB and redirect to canonical route
+        router.replace(`/resume-ai/${actualJobId}/applicant/${app.id}`);
+        return;
+      }
+
+      setName(app.full_name ?? "Unknown Applicant");
+      setJobTitle(app.job_title ?? "");
+      setResumeText(app.resume_text ?? "");
+
+      // 2) Load opening title (optional)
+      const { data: opening } = await supabase
+        .from("job_openings")
+        .select("title")
+        .eq("job_id", actualJobId)
+        .maybeSingle<OpeningRow>();
+
+      if (opening?.title) setJobTitle(opening.title ?? app.job_title ?? "");
+
+      // 3) Try latest match
+      const { data: matches, error: mErr } = await supabase
+        .from("resumeai_matches")
+        .select("match_rate, metrics, scored_at")
+        .eq("applicant_id", app.id)
+        .order("scored_at", { ascending: false })
+        .limit(1);
+
+      if (!mounted) return;
+
+      if (mErr) {
+        setErr(mErr.message);
+        setLoading(false);
+        return;
+      }
+
+      let currentMatch: MatchRow | null = (matches?.[0] as MatchRow) ?? null;
+
+      // 4) If no match yet, or resume_text exists but is new, compute now
+      if (!currentMatch) {
+        const res = await fetch("/api/ats/score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicantId }),
+        });
+        if (res.ok) {
+          const j = await res.json();
+          currentMatch = { match_rate: j.matchRate, metrics: j.metrics };
+        } else {
+          // Don't hard fail the page; just show resume without a score
+          const j = await res.json().catch(() => ({}));
+          console.warn("Scoring failed:", j?.error || res.statusText);
+        }
+      }
+
+      setMatch(currentMatch);
+      setLoading(false);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [applicantId, jobIdNum, router]);
+
+  async function handleDecision(next: "Approved" | "Declined") {
+    if (!applicantId) return;
+    setSavingDecision(next);
+    const { error } = await supabase
+      .from("resumeai_applicants")
+      .update({ decision: next })
+      .eq("id", applicantId);
+    if (error) {
+      alert(`Failed to set decision: ${error.message}`);
+    } else {
+      // Soft update UI state
+      // (We don't keep local decision in state separately; refetching isn't necessary for MVP)
+    }
+    setSavingDecision(null);
+  }
+
+  const metricsPairs = useMemo(
+    () =>
+      Object.entries(match?.metrics ?? {}).map(([label, value]) => ({
+        label,
+        value: Math.round(Number(value || 0)),
+      })),
+    [match]
+  );
+
+  if (loading) {
+    return <div className="bg-white rounded-lg border border-gray-200 p-6">Loading applicant…</div>;
+  }
+
+  if (err) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6 text-red-600">
+        Error: {err}{" "}
+        <Link href={`/resume-ai/${jobIdNum}`} className="ml-2 underline">
+          Back to applicants
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/resume-ai/${jobId}`} className="inline-flex items-center gap-2 text-gray-700 hover:underline">
+          <Link href={`/resume-ai/${jobIdNum}`} className="inline-flex items-center gap-2 text-gray-700 hover:underline">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Link>
           <h1 className="text-2xl font-semibold text-gray-900">Applicant AI Scan</h1>
+        </div>
+
+        {/* Quick actions */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="border-green-600 text-green-700 hover:bg-green-50"
+            disabled={savingDecision !== null}
+            onClick={() => handleDecision("Approved")}
+          >
+            {savingDecision === "Approved" ? "Saving…" : "Approve"}
+          </Button>
+          <Button
+            variant="outline"
+            className="border-red-600 text-red-700 hover:bg-red-50"
+            disabled={savingDecision !== null}
+            onClick={() => handleDecision("Declined")}
+          >
+            {savingDecision === "Declined" ? "Saving…" : "Decline"}
+          </Button>
         </div>
       </div>
 
@@ -125,15 +227,31 @@ export function ResumeAIApplicantDetail() {
         {/* Resume */}
         <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6">
           <div className="mb-4">
-            <div className="text-lg font-semibold text-gray-900">{data.name}</div>
-            <div className="text-gray-600">{data.jobTitle}</div>
+            <div className="text-lg font-semibold text-gray-900">{name || "Unknown Applicant"}</div>
+            <div className="text-gray-600">{jobTitle || "Unknown Role"}</div>
           </div>
+
+          {/* Optional: simple upload form (works with /api/resume/upload) */}
+          <form
+            action="/api/resume/upload"
+            method="POST"
+            encType="multipart/form-data"
+            className="flex items-center gap-3 mb-4"
+          >
+            <input type="hidden" name="jobId" value={jobIdNum} />
+            <input type="hidden" name="applicantId" value={String(applicantId)} />
+            <input type="file" name="file" accept=".pdf,.docx,.txt" className="text-sm" />
+            <Button type="submit" variant="outline" className="text-gray-700">
+              Upload / Replace Resume
+            </Button>
+          </form>
+
           <div className="border rounded-md">
             <div className="p-6 bg-white">
               <div className="mx-auto max-w-[700px] border rounded-md">
                 <div className="p-6">
                   <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 leading-6">
-                    {data.resumeText}
+                    {resumeText || "No resume text available yet. Upload a PDF/DOCX/TXT to extract text."}
                   </pre>
                 </div>
               </div>
@@ -143,27 +261,46 @@ export function ResumeAIApplicantDetail() {
 
         {/* AI Scan */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-lg font-semibold text-gray-900 mb-4">Match rate</div>
-          <Donut percent={data.scan.matchRate} />
-          <ul className="mt-6 space-y-3">
-            {data.scan.metrics.map((m) => (
-              <li key={m.label} className="flex items-center justify-between text-gray-700">
-                <span>{m.label}:</span>
-                <span className="font-medium">{m.value}%</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-8 grid grid-cols-2 gap-3">
-            <Button variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
-              Approve
-            </Button>
-            <Button variant="outline" className="border-red-600 text-red-700 hover:bg-red-50">
-              Decline
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-lg font-semibold text-gray-900">Match rate</div>
+            <Button
+              variant="outline"
+              className="text-gray-700"
+              onClick={async () => {
+                const res = await fetch("/api/ats/score", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ applicantId }),
+                });
+                if (res.ok) {
+                  const j = await res.json();
+                  setMatch({ match_rate: j.matchRate, metrics: j.metrics });
+                } else {
+                  const j = await res.json().catch(() => ({}));
+                  alert(j.error || "Failed to re-score");
+                }
+              }}
+            >
+              Re-score
             </Button>
           </div>
+
+          <Donut percent={match?.match_rate ?? 0} />
+
+          <ul className="mt-6 space-y-3">
+            {metricsPairs.length > 0 ? (
+              metricsPairs.map((m) => (
+                <li key={m.label} className="flex items-center justify-between text-gray-700">
+                  <span>{m.label}:</span>
+                  <span className="font-medium">{m.value}%</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-gray-500">No metrics yet. Upload a resume and click Re-score.</li>
+            )}
+          </ul>
         </div>
       </div>
     </div>
-  )
+  );
 }
