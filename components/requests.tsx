@@ -1,17 +1,26 @@
-// components/requests.tsx
+// TOP OF FILE
 "use client";
 
 import * as React from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+// import Link from "next/link"; // keep only if you actually link somewhere
+import { Search, Filter, Check, X, Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabaseClient";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Check, X, Eye, RotateCcw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 type RequestStatus = "pending" | "approved" | "declined";
 type HrType = "Leave" | "Shift Change" | "Expense";
@@ -29,6 +38,38 @@ type HrRequest = {
   processedBy?: string;
   declineReason?: string;
 };
+  type DBRequestRow = {
+    id: string;
+    type: HrType;
+    employee_id: string;
+    employee_name: string;
+    submitted_at: string;
+    date_start: string | null;
+    date_end: string | null;
+    amount: number | null;
+    notes: string | null;
+    status: RequestStatus;
+    processed_at: string | null;
+    processed_by: string | null;
+    decline_reason: string | null;
+    is_demo: boolean | null;
+  };
+
+  const toHr = (r: DBRequestRow): HrRequest => ({
+    id: r.id,
+    type: r.type,
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    submittedAt: r.submitted_at,
+    dateRange: r.date_start || r.date_end ? { start: r.date_start ?? "", end: r.date_end ?? "" } : undefined,
+    amount: r.amount ?? undefined,
+    notes: r.notes ?? undefined,
+    status: r.status,
+    processedAt: r.processed_at ?? undefined,
+    processedBy: r.processed_by ?? undefined,
+    declineReason: r.decline_reason ?? undefined,
+  });
+
 
 const KEY = "maplehr_requests_v3";
 const uid = () => crypto?.randomUUID?.() ?? `id_${Math.random().toString(36).slice(2)}`;
@@ -52,11 +93,38 @@ export default function Requests() {
   const [declineOpen, setDeclineOpen] = React.useState(false);
   const [sel, setSel] = React.useState<HrRequest | null>(null);
   const [reason, setReason] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState<string | null>(null);
+
 
   React.useEffect(() => {
-    const existing = load();
-    if (!existing.length) seed();
-    setRows(load());
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+
+      const { data, error } = await supabase
+        .from("hr_requests")
+        .select(`
+          id, type, employee_id, employee_name, submitted_at,
+          date_start, date_end, amount, notes, status,
+          processed_at, processed_by, decline_reason, is_demo
+        `)
+        .order("submitted_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        setErr(error.message);
+        setRows([]);
+      } else {
+        setRows((data ?? []).map(toHr));
+      }
+
+      setLoading(false);
+    })();
+
+    return () => { mounted = false; };
   }, []);
 
   const list = React.useMemo(() => {
@@ -73,57 +141,210 @@ export default function Requests() {
   const patch = (next: HrRequest) =>
     setRows((prev) => { const arr = prev.map((x) => (x.id === next.id ? next : x)); save(arr); return arr; });
 
-  const approve = (r: HrRequest) =>
-    r.status === "pending" && patch({ ...r, status: "approved", processedAt: new Date().toISOString(), processedBy: "Admin" });
+  const approve = async (r: HrRequest) => {
+    if (r.status !== "pending") return;
 
-  const decline = (r: HrRequest, why: string) =>
-    r.status === "pending" &&
-    patch({ ...r, status: "declined", processedAt: new Date().toISOString(), processedBy: "Admin", declineReason: why || undefined });
+    const next: HrRequest = {
+      ...r,
+      status: "approved",
+      processedAt: new Date().toISOString(),
+      processedBy: "Admin",
+    };
 
-  const reset = () => { seed(); setRows(load()); setQ(""); setTypeFilter(""); setStatusFilter(""); setSel(null); setViewOpen(false); setDeclineOpen(false); setReason(""); };
+    setRows((prev) => prev.map((x) => (x.id === r.id ? next : x)));
+
+    const { error } = await supabase
+      .from("hr_requests")
+      .update({
+        status: "approved",
+        processed_at: next.processedAt,
+        processed_by: next.processedBy,
+        decline_reason: null,
+      })
+      .eq("id", r.id);
+
+    if (error) {
+      alert(`Approve failed: ${error.message}`);
+      setRows((prev) => prev.map((x) => (x.id === r.id ? r : x)));
+    }
+  };
+
+  const decline = async (r: HrRequest, why: string) => {
+    if (r.status !== "pending") return;
+
+    const next: HrRequest = {
+      ...r,
+      status: "declined",
+      processedAt: new Date().toISOString(),
+      processedBy: "Admin",
+      declineReason: why || undefined,
+    };
+
+    setRows((prev) => prev.map((x) => (x.id === r.id ? next : x)));
+
+    const { error } = await supabase
+      .from("hr_requests")
+      .update({
+        status: "declined",
+        processed_at: next.processedAt,
+        processed_by: next.processedBy,
+        decline_reason: next.declineReason ?? null,
+      })
+      .eq("id", r.id);
+
+    if (error) {
+      alert(`Decline failed: ${error.message}`);
+      setRows((prev) => prev.map((x) => (x.id === r.id ? r : x)));
+    }
+  };
+
+  async function seedDemoIntoDB() {
+    const demoRows = [
+      {
+        type: "Leave" as HrType,
+        employee_id: "000915041",
+        employee_name: "Abel Fekadu",
+        submitted_at: new Date(Date.now() - 3 * 864e5).toISOString(),
+        date_start: "2025-09-20",
+        date_end: "2025-09-25",
+        notes: "Family trip – PTO",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+      {
+        type: "Shift Change" as HrType,
+        employee_id: "000394998",
+        employee_name: "Hunter Tapping",
+        submitted_at: new Date(Date.now() - 20 * 36e5).toISOString(),
+        date_start: "2025-09-22",
+        date_end: "2025-09-22",
+        notes: "Swap evening shift with Naya",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+      {
+        type: "Expense" as HrType,
+        employee_id: "000957380",
+        employee_name: "Naya Bektenova",
+        submitted_at: new Date(Date.now() - 6 * 36e5).toISOString(),
+        amount: 124.56,
+        notes: "Conference taxi receipts",
+        status: "pending" as RequestStatus,
+        is_demo: true,
+      },
+    ];
+    const { error } = await supabase.from("hr_requests").insert(demoRows);
+    if (error) throw error;
+  }
+
+  const reset = async () => {
+    setLoading(true);
+    setErr(null);
+
+    const { error: delErr } = await supabase
+      .from("hr_requests")
+      .delete()
+      .eq("is_demo", true);
+
+    if (delErr) {
+      setLoading(false);
+      setErr(delErr.message);
+      return;
+    }
+
+    try {
+      await seedDemoIntoDB();
+    } catch (e: any) {
+      setLoading(false);
+      setErr(e?.message ?? String(e));
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("hr_requests")
+      .select(`
+        id, type, employee_id, employee_name, submitted_at,
+        date_start, date_end, amount, notes, status,
+        processed_at, processed_by, decline_reason, is_demo
+      `)
+      .order("submitted_at", { ascending: false });
+
+    if (error) {
+      setErr(error.message);
+      setRows([]);
+    } else {
+      setRows((data ?? []).map(toHr));
+    }
+
+    setQ("");
+    setTypeFilter("");
+    setStatusFilter("");
+    setSel(null);
+    setViewOpen(false);
+    setDeclineOpen(false);
+    setReason("");
+    setLoading(false);
+  };
+
 
   const StatusBadge = ({ s }: { s: RequestStatus }) => (
     <Badge variant={s === "pending" ? "secondary" : s === "approved" ? "default" : "destructive"}>{s}</Badge>
   );
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <CardTitle className="text-base">Request Management</CardTitle>
+  <div className="bg-white rounded-lg border border-gray-200 px-8">
+    {/* Top toolbar */}
+    <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
+      <div className="flex items-center gap-4">
+        {/* Search input with icon */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Filters dropdown (Type + Status) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+              <Filter className="h-4 w-4" />
+              Filters
+              {typeFilter ? `: ${typeFilter}` : ""}
+              {statusFilter ? ` • ${statusFilter}` : ""}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuLabel>Type</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setTypeFilter("")}>All</DropdownMenuItem>
+            {(["Leave", "Shift Change", "Expense"] as HrType[]).map((t) => (
+              <DropdownMenuItem key={t} onClick={() => setTypeFilter(t)}>{t}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => setStatusFilter("")}>All</DropdownMenuItem>
+            {(["pending", "approved", "declined"] as RequestStatus[]).map((s) => (
+              <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}>{s}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { setTypeFilter(""); setStatusFilter(""); }}>
+              Clear filters
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Reset demo data button */}
         <Button variant="outline" size="sm" onClick={reset}>
           <RotateCcw className="mr-2 h-4 w-4" /> Reset demo data
         </Button>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Filters */}
-        <div className="grid gap-3 md:grid-cols-[1fr_200px_200px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, ID, notes…" className="pl-9" />
-          </div>
-
-          {/* Selects use 'all' sentinel to avoid empty value error */}
-          <Select value={typeFilter || "all"} onValueChange={(v) => setTypeFilter(v === "all" ? "" : (v as HrType))}>
-            <SelectTrigger><SelectValue placeholder="Type (All)" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="Leave">Leave</SelectItem>
-              <SelectItem value="Shift Change">Shift Change</SelectItem>
-              <SelectItem value="Expense">Expense</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : (v as RequestStatus))}>
-            <SelectTrigger><SelectValue placeholder="Status (All)" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+    </div>
 
         <Separator />
 
@@ -131,39 +352,33 @@ export default function Requests() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Employee</TableHead>
-              <TableHead>Submitted</TableHead>
+              <TableHead className="w-40">Type</TableHead>
+              <TableHead className="w-[260px]">Employee</TableHead>
+              <TableHead className="w-48">Submitted</TableHead>
               <TableHead>Details</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[220px]">Actions</TableHead>
+              <TableHead className="w-28">Status</TableHead>
+              <TableHead className="w-64 text-right"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {list.map((r) => (
               <TableRow key={r.id} className="hover:bg-gray-50">
-                {/* TYPE with icon-only “view” on the LEFT */}
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="View details"
-                      onClick={() => { setSel(r); setViewOpen(true); }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <span>{r.type}</span>
-                  </div>
-                </TableCell>
+                {/* Type */}
+                <TableCell className="font-medium">{r.type}</TableCell>
 
+                {/* Employee */}
                 <TableCell>
                   <div className="leading-tight">
                     <div className="font-medium">{r.employeeName}</div>
                     <div className="text-xs text-muted-foreground">ID: {r.employeeId}</div>
                   </div>
                 </TableCell>
+
+                {/* Submitted */}
                 <TableCell className="text-gray-600">{fmt(r.submittedAt)}</TableCell>
+
+                {/* Details */}
                 <TableCell className="text-gray-700">
                   {r.type === "Expense" && typeof r.amount === "number"
                     ? `Amount: $${r.amount.toFixed(2)}`
@@ -171,24 +386,49 @@ export default function Requests() {
                     ? `Dates: ${r.dateRange.start} → ${r.dateRange.end}`
                     : r.notes ?? "—"}
                 </TableCell>
-                <TableCell><StatusBadge s={r.status} /></TableCell>
+
+                {/* Status */}
                 <TableCell>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={r.status !== "pending"} onClick={() => approve(r)}>
-                      <Check className="mr-2 h-4 w-4" /> Approve
+                  <StatusBadge s={r.status} />
+                </TableCell>
+
+                {/* Actions (right-aligned) */}
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-3">
+                    {/* View — outline green */}
+                    <Button
+                      variant="outline"
+                      className="border-green-600 text-green-700 hover:bg-green-50"
+                      onClick={() => { setSel(r); setViewOpen(true); }}
+                    >
+                      <Eye className="mr-2 h-4 w-4" /> View
                     </Button>
+
+                    {/* Approve — solid green */}
                     <Button
                       size="sm"
-                      variant="destructive"
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={r.status !== "pending"}
+                      onClick={() => approve(r)}
+                    >
+                      <Check className="mr-2 h-4 w-4" /> Approve
+                    </Button>
+
+                    {/* Decline — red text link */}
+                    <button
+                      className="text-red-600 hover:underline text-sm"
                       disabled={r.status !== "pending"}
                       onClick={() => { setSel(r); setReason(""); setDeclineOpen(true); }}
                     >
-                      <X className="mr-2 h-4 w-4" /> Decline
-                    </Button>
+                      <span className="inline-flex items-center">
+                        <X className="mr-2 h-4 w-4" /> Decline
+                      </span>
+                    </button>
                   </div>
                 </TableCell>
               </TableRow>
             ))}
+
             {list.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
@@ -197,8 +437,9 @@ export default function Requests() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
 
+        </Table>
+      
         {/* View dialog */}
         <Dialog open={viewOpen} onOpenChange={setViewOpen}>
           <DialogContent>
@@ -244,7 +485,6 @@ export default function Requests() {
             </div>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
   );
 }

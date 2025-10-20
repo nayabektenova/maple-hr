@@ -104,16 +104,58 @@ export function ResumeAIJobOpenings() {
   }, [rows, search, dept, type]);
 
   // Delete by numeric job_id
-  async function handleDelete(jobId: number) {
-    if (!confirm("Delete this job opening? This removes it only from 'job_openings'.")) return;
-    const prev = rows;
-    setRows((p) => p.filter((x) => x.jobId !== jobId)); // optimistic
-    const { error } = await supabase.from("job_openings").delete().eq("job_id", jobId);
-    if (error) {
-      setRows(prev); // rollback
-      alert(`Failed to delete job: ${error.message}`);
+  async function handleDelete(jobId: number, legacyId?: string) {
+  if (!confirm("Delete this job opening? This removes it only from 'job_openings'.")) return;
+
+  const prev = rows;
+  setRows((p) => p.filter((x) => x.jobId !== jobId)); // optimistic
+
+  try {
+    // Primary attempt: delete by numeric job_id
+    let q = supabase
+      .from("job_openings")
+      .delete()
+      .eq("job_id", jobId)
+      .select(); // return deleted rows for verification
+
+    let { data, error } = await q;
+
+    // If nothing deleted and we have a legacy string id, try that too
+    if (!error && Array.isArray(data) && data.length === 0 && legacyId) {
+      const second = await supabase
+        .from("job_openings")
+        .delete()
+        .eq("id", legacyId)
+        .select();
+
+      data = second.data as any;
+      error = second.error ?? null;
     }
+
+    if (error) {
+      console.error("DELETE failed:", error);
+      alert(`Failed to delete job: ${error.message}`);
+      setRows(prev); // rollback
+      return;
+    }
+
+    // If still nothing came back, it likely didn't match (type mismatch or no row)
+    if (!data || data.length === 0) {
+      console.warn("No rows deleted. Check job_id type/value and RLS policies.");
+      alert("No rows were deleted. Verify job_id matches the DB and RLS allows DELETE.");
+      setRows(prev); // rollback
+      return;
+    }
+
+    // Success — optionally toast here
+    // console.log("Deleted rows:", data);
+  } catch (e: any) {
+    console.error("DELETE exception:", e);
+    alert(`Failed to delete job: ${e?.message ?? e}`);
+    setRows(prev); // rollback
   }
+}
+
 
   if (loading) {
     return (
@@ -132,7 +174,7 @@ export function ResumeAIJobOpenings() {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
+    <div className="bg-white rounded-lg border border-gray-200 px-8">
       {/* Header toolbar */}
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         <div className="flex items-center gap-4">
