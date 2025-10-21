@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 
-export default function RequestsLayout({
+export default function submitClaimLayout({
   children,
 }: {
   children: React.ReactNode;

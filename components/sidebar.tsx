@@ -11,6 +11,7 @@ import {
   Plane,
   DollarSign,
   MessageSquare,
+  ArrowLeftRight,
   FileIcon as FileUser,
   ClipboardList,
   Sparkles,
