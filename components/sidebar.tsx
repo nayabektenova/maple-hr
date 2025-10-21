@@ -31,6 +31,9 @@ const navigation = [
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "My Requests", href: "/requests-employee", icon: FileUser },
+  { name: "Employee Dashboard", href: "/employeeview/employee-dashboard", icon: FileUser },
+
+
 
 ]
 
