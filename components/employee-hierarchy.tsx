@@ -1,4 +1,9 @@
 // components/employee-hierarchy.tsx
+// there is some of the code like making the tree structure and svg connectors that is a bit long
+// so I added comments to explain those parts and broke them into smaller components
+// also added a custom select component for better styling which is helped by copilot
+
+
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
