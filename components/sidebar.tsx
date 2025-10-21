@@ -11,6 +11,7 @@ import {
   Plane,
   DollarSign,
   MessageSquare,
+  ArrowLeftRight,
   FileIcon as FileUser,
 } from "lucide-react"
 
@@ -31,7 +32,7 @@ const navigation = [
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "My Requests", href: "/requests-employee", icon: FileUser },
   { name: "Employee Dashboard", href: "/employeeview/employee-dashboard", icon: FileUser },
-
+  { name: "Shift Swap", href: "/employeeview/shiftswap", icon: ArrowLeftRight },
 
 
 ]
