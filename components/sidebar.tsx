@@ -23,7 +23,7 @@ const navigation = [
   { name: "Employees Hierarchy", href: "/employee-hierarchy", icon: Users },
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Leaves", href: "/leaves", icon: Plane },
-  
+  { name: "PayStub", href: "/paystub", icon: DollarSign },
   { name: "Finances", href: "/finances", icon: DollarSign },
   { name: "Survey", href: "/survey", icon: MessageSquare },
   { name: "Resume AI", href: "/resume-ai", icon: Sparkles },

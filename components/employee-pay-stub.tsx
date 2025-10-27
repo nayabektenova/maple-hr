@@ -68,7 +68,7 @@ function saveDirect(data: DirectDeposit) {
   localStorage.setItem(DIRECT_KEY, JSON.stringify(data));
 }
 
-export default function EmployeePay() {
+export default function EmployeePayStub() {
   const [stubs, setStubs] = React.useState<Paystub[]>([]);
   const [form, setForm] = React.useState<DirectDeposit>({
     accountHolder: "",
