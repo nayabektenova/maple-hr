@@ -65,22 +65,15 @@ export default function PayrollCalculatorPage() {
     const h = parseFloat(hoursWorked) || 0;
     const r = parseFloat(hourlyRate) || 0;
 
-    const gross = h * r;
-
-    // CPP placeholder ~5.95%. Real CPP later (YTD, exemption, max).
-    const cppRate = 0.0595;
-    const cpp = gross * cppRate;
-
-    const net = gross - cpp;
-
-    setResult({
-      grossPay: round2(gross),
-      cpp: round2(cpp),
-      net: round2(net),
+    const payroll = calcPayroll({
+      hoursWorked: h,
+      hourlyRate: r,
     });
 
+    setResult(payroll);
     setSavedNotice(null);
   }
+
 
 
   async function handleSave() {
