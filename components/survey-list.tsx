@@ -180,7 +180,7 @@ export function SurveyList() {
   async function createAndPublish() {
     setLoading(true)
     try {
-      // 1️⃣ Insert survey into Survey table
+      // Insert survey into Survey table
       const { data: surveyData, error: surveyError } = await supabase
         .from("survey")
         .insert([{
@@ -195,7 +195,7 @@ export function SurveyList() {
       if (surveyError) throw surveyError
       const surveyId = surveyData.survey_id
 
-      // 2️⃣ Insert related questions into Questions table
+      // Insert related questions into Questions table
       if (draft.questions.length > 0) {
         const questionInserts = draft.questions.map((q) => ({
           survey_id: surveyId,
@@ -526,6 +526,7 @@ export function SurveyList() {
 }
 
 /* ======================== Helpers ======================== */
+// Simple random ID generator
 function cryptoRandomId() {
   return Math.random().toString(36).slice(2)
 }
