@@ -124,7 +124,7 @@ export default function EmployeePayStub() {
       {/* Left: Pay history */}
       <Card className="md:col-span-2">
         <CardHeader className="flex items-center justify-between">
-          <CardTitle className="text-base">Paycheque History</CardTitle>
+          <CardTitle className="text-base">Employee PayStub</CardTitle>
           <Button variant="outline" size="sm" onClick={resetDemo}>Reset demo data</Button>
         </CardHeader>
         <CardContent>
