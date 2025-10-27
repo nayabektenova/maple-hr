@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 type CalcResult = {
   grossPay: number;
@@ -58,6 +59,13 @@ export default function PayrollCalculatorPage() {
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function handleCalculate() {
+  // placeholder for now
+  }
+
+  async function handleSave() {
+  // will connect to Supabase later
+  }
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <Card>
@@ -113,6 +121,31 @@ export default function PayrollCalculatorPage() {
               placeholder="20.00"
             />
           </section>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              type="button"
+              onClick={handleCalculate}
+            >
+              Calculate
+            </Button>
+
+            <Button
+              variant="outline"
+              type="button"
+              disabled={!result || saving}
+              onClick={handleSave}
+            >
+              {saving ? "Saving..." : "Save to Payroll"}
+            </Button>
+
+            {savedNotice && (
+              <span className="text-sm text-gray-500">{savedNotice}</span>
+            )}
+          </div>
+
+          <Separator />
         </CardContent>
       </Card>
     </div>
