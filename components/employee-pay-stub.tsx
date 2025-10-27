@@ -23,16 +23,7 @@ type Paystub = {
   net: number;
 };
 
-type DirectDeposit = {
-  accountHolder: string;
-  bankName: string;
-  transitNumber: string;     // 5 digits in CA
-  institutionNumber: string; // 3 digits in CA
-  accountNumber: string;     // varies
-};
-
 const STUBS_KEY = "maplehr_paystubs_v1";
-const DIRECT_KEY = "maplehr_direct_deposit_v1";
 
 const uid = () => crypto?.randomUUID?.() ?? `id_${Math.random().toString(36).slice(2)}`;
 const cad = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(n);
@@ -53,71 +44,123 @@ function saveStubs(rows: Paystub[]) {
   localStorage.setItem(STUBS_KEY, JSON.stringify(rows));
 }
 function seedStubs() {
+  // create demo rows with consistent derived fields
+  const make = (employeeName: string, periodStart: string, periodEnd: string, payDate: string, totalHours: number, minPayPerHr: number) => {
+    const gross = Math.round(totalHours * minPayPerHr * 100) / 100;
+    const { cpp, ei, ft } = calculateDeductions(gross);
+    const deductions = Math.round((cpp + ei + ft) * 100) / 100;
+    const net = Math.round((gross - deductions) * 100) / 100;
+    return { id: uid(), employeeName, periodStart, periodEnd, payDate, totalHours, minPayPerHr, gross, cpp, ei, ft, deductions, net } as Paystub;
+  };
+
   const demo: Paystub[] = [
-    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
-    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-01", periodEnd: "2025-08-15", payDate: "2025-08-20", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
-    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-07-16", periodEnd: "2025-07-31", payDate: "2025-08-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
-    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-07-01", periodEnd: "2025-07-15", payDate: "2025-07-20", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
-    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
-    ];
+    make("Jane Doe", "2025-08-16", "2025-08-31", "2025-09-05", 80, 40),
+    make("John Smith", "2025-08-01", "2025-08-15", "2025-08-20", 80, 40),
+    make("Alex Rivera", "2025-07-16", "2025-07-31", "2025-08-05", 80, 40),
+    make("Priya K", "2025-07-01", "2025-07-15", "2025-07-20", 80, 40),
+  ];
   saveStubs(demo);
 }
 
-function loadDirect(): DirectDeposit | null {
-  try {
-    const raw = localStorage.getItem(DIRECT_KEY);
-    return raw ? (JSON.parse(raw) as DirectDeposit) : null;
-  } catch {
-    return null;
-  }
-}
-function saveDirect(data: DirectDeposit) {
-  localStorage.setItem(DIRECT_KEY, JSON.stringify(data));
+/* Company formulas */
+const CPP_EXEMPTION = 134.62;
+const CPP_RATE = 0.0595; // 5.95%
+const EI_RATE = 0.0164; // 1.64%
+const FT_THRESHOLD = 605; // CAD
+const FT_RATE = 0.145; // 14.5%
+
+function calculateDeductions(gross: number) {
+  const cppRaw = gross > CPP_EXEMPTION ? (gross - CPP_EXEMPTION) * CPP_RATE : 0;
+  const eiRaw = gross * EI_RATE;
+  const ftRaw = gross > FT_THRESHOLD ? (gross - FT_THRESHOLD) * FT_RATE : 0;
+  const round = (n:number) => Math.round(n * 100) / 100;
+  return { cpp: round(cppRaw), ei: round(eiRaw), ft: round(ftRaw) };
 }
 
 export default function EmployeePayStub() {
   const [stubs, setStubs] = React.useState<Paystub[]>([]);
-  const [form, setForm] = React.useState<DirectDeposit>({
-    accountHolder: "",
-    bankName: "",
-    transitNumber: "",
-    institutionNumber: "",
-    accountNumber: "",
-  });
   const [notice, setNotice] = React.useState<string | null>(null);
+
+  // generate form state
+  const [gen, setGen] = React.useState({
+    employeeName: "",
+    payDate: "",
+    periodStart: "",
+    periodEnd: "",
+    totalHours: "",     // string so Input works smoothly
+    minPayPerHr: ""
+  });
+  const [genNotice, setGenNotice] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const s = loadStubs();
     if (!s.length) seedStubs();
     setStubs(loadStubs());
-
-    const d = loadDirect();
-    if (d) setForm(d);
   }, []);
-
-  const onChange = (key: keyof DirectDeposit) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [key]: e.target.value }));
-  };
-
-  const save = () => {
-    // Basic trim-only “validation” to keep it simple
-    const next: DirectDeposit = {
-      accountHolder: form.accountHolder.trim(),
-      bankName: form.bankName.trim(),
-      transitNumber: form.transitNumber.trim(),
-      institutionNumber: form.institutionNumber.trim(),
-      accountNumber: form.accountNumber.trim(),
-    };
-    saveDirect(next);
-    setNotice("Direct deposit info saved (local only).");
-    setTimeout(() => setNotice(null), 2500);
-  };
 
   const resetDemo = () => {
     seedStubs();
     setStubs(loadStubs());
     setNotice("Demo paycheques reset.");
     setTimeout(() => setNotice(null), 2000);
+  };
+
+  const onGenChange = (key: keyof typeof gen) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGen(prev => ({ ...prev, [key]: e.target.value }));
+  };
+
+  const resetGen = () => {
+    setGen({
+      employeeName: "",
+      payDate: "",
+      periodStart: "",
+      periodEnd: "",
+      totalHours: "",
+      minPayPerHr: ""
+    });
+    setGenNotice(null);
+  };
+
+  const onGenerate = () => {
+    const employeeName = gen.employeeName.trim();
+    const payDate = gen.payDate;
+    const periodStart = gen.periodStart;
+    const periodEnd = gen.periodEnd;
+    const totalHours = Number(gen.totalHours);
+    const minPayPerHr = Number(gen.minPayPerHr);
+
+    if (!employeeName || !payDate || !periodStart || !periodEnd || isNaN(totalHours) || isNaN(minPayPerHr)) {
+      setGenNotice("Please fill all fields correctly.");
+      setTimeout(() => setGenNotice(null), 2200);
+      return;
+    }
+
+    // calculate gross and deductions
+    const gross = Math.round(totalHours * minPayPerHr * 100) / 100;
+    const { cpp, ei, ft } = calculateDeductions(gross);
+    const deductions = Math.round((cpp + ei + ft) * 100) / 100;
+    const net = Math.round((gross - deductions) * 100) / 100;
+
+    const newStub: Paystub = {
+      id: uid(),
+      employeeName,
+      periodStart,
+      periodEnd,
+      payDate,
+      totalHours,
+      minPayPerHr,
+      gross,
+      cpp, ei, ft,
+      deductions,
+      net,
+    };
+
+    const next = [ ...stubs, newStub ];
+    saveStubs(next);
+    setStubs(next);
+    setGenNotice("Paystub generated and saved.");
+    setTimeout(() => setGenNotice(null), 2400);
+    resetGen();
   };
 
   // Sort newest first by pay date
@@ -128,36 +171,92 @@ export default function EmployeePayStub() {
 
   return (
     <div className="grid gap-6 md:grid-cols-3">
-      {/* Left: Pay history */}
+      {/* Generate Paystub (full width column span so it sits above list) */}
+      <Card className="md:col-span-3">
+        <CardHeader>
+          <CardTitle className="text-base">Generate Paystub</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {genNotice && (
+            <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">{genNotice}</div>
+          )}
+
+          <div className="grid gap-2 md:grid-cols-3">
+            <div>
+              <label className="text-sm">Employee name</label>
+              <Input value={gen.employeeName} onChange={onGenChange("employeeName")} placeholder="Full name" />
+            </div>
+
+            <div>
+              <label className="text-sm">Pay date</label>
+              <Input type="date" value={gen.payDate} onChange={onGenChange("payDate")} />
+            </div>
+
+            <div>
+              <label className="text-sm">Period start</label>
+              <Input type="date" value={gen.periodStart} onChange={onGenChange("periodStart")} />
+            </div>
+
+            <div>
+              <label className="text-sm">Period end</label>
+              <Input type="date" value={gen.periodEnd} onChange={onGenChange("periodEnd")} />
+            </div>
+
+            <div>
+              <label className="text-sm">Total hours</label>
+              <Input type="number" value={gen.totalHours} onChange={onGenChange("totalHours")} placeholder="e.g. 80" />
+            </div>
+
+            <div>
+              <label className="text-sm">Min pay/hr</label>
+              <Input type="number" value={gen.minPayPerHr} onChange={onGenChange("minPayPerHr")} placeholder="e.g. 40" />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={onGenerate}>Generate & Save</Button>
+            <Button variant="outline" onClick={resetGen}>Reset</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Left: Pay history (now "Employee Paystub") */}
       <Card className="md:col-span-2">
         <CardHeader className="flex items-center justify-between">
-          <CardTitle className="text-base">Employee PayStub</CardTitle>
+          <CardTitle className="text-base">Employee Paystub</CardTitle>
           <Button variant="outline" size="sm" onClick={resetDemo}>Reset demo data</Button>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Employee</TableHead>
                 <TableHead>Pay Date</TableHead>
                 <TableHead>Period</TableHead>
-                <TableHead>Gross</TableHead>
+                <TableHead>Total Hours</TableHead>
+                <TableHead>Min Pay/hr</TableHead>
+                <TableHead>Gross Pay</TableHead>
                 <TableHead>Deductions</TableHead>
-                <TableHead>Net</TableHead>
+                <TableHead>Net Pay</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((p) => (
                 <TableRow key={p.id} className="hover:bg-gray-50">
+                  <TableCell>{p.employeeName}</TableCell>
                   <TableCell>{fmtDate(p.payDate)}</TableCell>
                   <TableCell>{fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}</TableCell>
+                  <TableCell>{p.totalHours}</TableCell>
+                  <TableCell>{cad(p.minPayPerHr)}</TableCell>
                   <TableCell>{cad(p.gross)}</TableCell>
                   <TableCell>{cad(p.deductions)}</TableCell>
                   <TableCell className="font-medium">{cad(p.net)}</TableCell>
                 </TableRow>
               ))}
+
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     No paycheques found.
                   </TableCell>
                 </TableRow>
@@ -167,51 +266,31 @@ export default function EmployeePayStub() {
         </CardContent>
       </Card>
 
-      {/* Right: Direct deposit */}
+      {/* Right column: Deduction summary for last generated (OPTIONAL) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Update Direct Deposit Information</CardTitle>
+          <CardTitle className="text-base">Last Calculation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {notice && (
-            <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">{notice}</div>
+          {/* We show quick summary for the most recent generated stub if exists */}
+          {rows.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No calculations yet.</div>
+          ) : (
+            (() => {
+              const last = rows[rows.length - 1]; // last added
+              return (
+                <div className="space-y-2 text-sm">
+                  <div><strong>{last.employeeName}</strong></div>
+                  <div>Gross pay: {cad(last.gross)}</div>
+                  <div>CPP deduction: {cad(last.cpp)}</div>
+                  <div>EI deduction: {cad(last.ei)}</div>
+                  <div>Federal tax (FT): {cad(last.ft)}</div>
+                  <Separator />
+                  <div className="font-medium">Net pay: {cad(last.net)}</div>
+                </div>
+              );
+            })()
           )}
-
-          <div className="grid gap-2">
-            <label className="text-sm">Account holder</label>
-            <Input value={form.accountHolder} onChange={onChange("accountHolder")} placeholder="Full name on account" />
-          </div>
-
-          <div className="grid gap-2">
-            <label className="text-sm">Bank name</label>
-            <Input value={form.bankName} onChange={onChange("bankName")} placeholder="e.g., RBC, TD, Scotiabank" />
-          </div>
-
-          <div className="grid gap-2">
-            <label className="text-sm">Transit number (5 digits)</label>
-            <Input value={form.transitNumber} onChange={onChange("transitNumber")} placeholder="12345" />
-          </div>
-
-          <div className="grid gap-2">
-            <label className="text-sm">Institution number (3 digits)</label>
-            <Input value={form.institutionNumber} onChange={onChange("institutionNumber")} placeholder="003" />
-          </div>
-
-          <div className="grid gap-2">
-            <label className="text-sm">Account number</label>
-            <Input value={form.accountNumber} onChange={onChange("accountNumber")} placeholder="xxxxxxxxx" />
-          </div>
-
-          <Separator />
-
-          <div className="flex gap-2">
-            <Button className="bg-green-600 hover:bg-green-700" onClick={save}>Save</Button>
-            <Button variant="outline" onClick={() => setForm(loadDirect() ?? {
-              accountHolder: "", bankName: "", transitNumber: "", institutionNumber: "", accountNumber: ""
-            })}>
-              Revert
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>
