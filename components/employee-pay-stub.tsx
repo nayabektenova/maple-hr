@@ -9,11 +9,17 @@ import { Separator } from "@/components/ui/separator";
 
 type Paystub = {
   id: string;
+  employeeName: string;
   periodStart: string; // YYYY-MM-DD
   periodEnd: string;   // YYYY-MM-DD
   payDate: string;     // YYYY-MM-DD
+  totalHours: number;
+  minPayPerHr: number;
   gross: number;
-  deductions: number;
+  cpp: number;
+  ei: number;
+  ft: number;
+  deductions: number; // cpp+ei+ft
   net: number;
 };
 
@@ -48,11 +54,12 @@ function saveStubs(rows: Paystub[]) {
 }
 function seedStubs() {
   const demo: Paystub[] = [
-    { id: uid(), periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", gross: 3200, deductions: 640, net: 2560 },
-    { id: uid(), periodStart: "2025-08-01", periodEnd: "2025-08-15", payDate: "2025-08-20", gross: 3200, deductions: 620, net: 2580 },
-    { id: uid(), periodStart: "2025-07-16", periodEnd: "2025-07-31", payDate: "2025-08-05", gross: 3200, deductions: 630, net: 2570 },
-    { id: uid(), periodStart: "2025-07-01", periodEnd: "2025-07-15", payDate: "2025-07-20", gross: 3200, deductions: 615, net: 2585 },
-  ];
+    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
+    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-01", periodEnd: "2025-08-15", payDate: "2025-08-20", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
+    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-07-16", periodEnd: "2025-07-31", payDate: "2025-08-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
+    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-07-01", periodEnd: "2025-07-15", payDate: "2025-07-20", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
+    { id: uid(), employeeName: "Jane Doe", periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", totalHours: 80, minPayPerHr: 40, gross: 3200, cpp: (3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0, ei: 3200 * 0.0164, ft: (3200 > 605) ? (3200 - 605) * 0.145 : 0, deductions: ((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0), net: 3200 - (((3200 - 134.62 > 0) ? (3200 - 134.62) * 0.0595 : 0) + (3200 * 0.0164) + ((3200 > 605) ? (3200 - 605) * 0.145 : 0)) },
+    ];
   saveStubs(demo);
 }
 
