@@ -146,8 +146,56 @@ export default function PayrollCalculatorPage() {
           </div>
 
           <Separator />
+          <section className="grid md:grid-cols-2 gap-6">
+            <Card className="border border-gray-200 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-gray-800">
+                  Calculated Results
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-gray-700">
+                <Row label="Gross Pay">{money(result?.grossPay)}</Row>
+
+                <Row label="CPP Deduction">{money(result?.cpp)}</Row>
+
+                {/* Future:
+                <Row label="EI Deduction">{money(result?.ei)}</Row>
+                <Row label="Tax / FT Deduction">{money(result?.ft)}</Row>
+                */}
+
+                <Separator className="my-2" />
+
+                <Row label="Net Pay (Take Home)" bold>
+                  {money(result?.net)}
+                </Row>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-gray-800">
+                  Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-gray-700">
+                <Row label="Employee">{employeeName || "—"}</Row>
+                <Row label="Employee ID">{employeeId || "—"}</Row>
+                <Row label="Hours">{hoursWorked || "—"}</Row>
+                <Row label="Rate ($/hr)">{hourlyRate || "—"}</Row>
+              </CardContent>
+            </Card>
+          </section>
         </CardContent>
       </Card>
     </div>
   );
+  function round2(n: number) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function money(n: number | undefined) {
+    if (n === undefined || Number.isNaN(n)) return "—";
+    return `$${n.toFixed(2)}`;
+  }
+
 }
