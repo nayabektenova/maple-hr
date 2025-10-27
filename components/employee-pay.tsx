@@ -2,12 +2,51 @@
 
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 type CalcResult = {
   grossPay: number;
   cpp: number;
   net: number;
 };
+
+function Field(props: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+  min?: string;
+  step?: string;
+}) {
+  const { label, ...inputProps } = props;
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <Input {...inputProps} />
+    </div>
+  );
+}
+
+function Row({
+  label,
+  children,
+  bold,
+}: {
+  label: string;
+  children: React.ReactNode;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-600">{label}</span>
+      <span className={bold ? "font-semibold text-gray-900" : ""}>
+        {children ?? "—"}
+      </span>
+    </div>
+  );
+}
 
 export default function PayrollCalculatorPage() {
   const [employeeName, setEmployeeName] = useState("");
@@ -16,7 +55,6 @@ export default function PayrollCalculatorPage() {
   const [hourlyRate, setHourlyRate] = useState<string>("");
 
   const [result, setResult] = useState<CalcResult | null>(null);
-
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -32,8 +70,49 @@ export default function PayrollCalculatorPage() {
             (Canada Pension Plan). EI and tax (FT) are planned but not active yet.
           </p>
         </CardHeader>
-        <CardContent>
-          <p className="text-gray-500 text-sm">Form goes here…</p>
+
+        <CardContent className="space-y-6">
+          {/* Employee info */}
+          <section className="grid md:grid-cols-2 gap-4">
+            <Field
+              label="Employee Name"
+              value={employeeName}
+              onChange={(e) => setEmployeeName(e.target.value)}
+              placeholder="Jane Doe"
+            />
+
+            <Field
+              label="Employee ID / Number"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              placeholder="E-1024"
+            />
+          </section>
+
+          <Separator />
+
+          {/* Pay input */}
+          <section className="grid md:grid-cols-2 gap-4">
+            <Field
+              label="Hours Worked (this period)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={hoursWorked}
+              onChange={(e) => setHoursWorked(e.target.value)}
+              placeholder="80"
+            />
+
+            <Field
+              label="Hourly Rate ($/hr)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+              placeholder="20.00"
+            />
+          </section>
         </CardContent>
       </Card>
     </div>
