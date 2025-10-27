@@ -85,8 +85,46 @@ export default function PayrollCalculatorPage() {
 
 
   async function handleSave() {
-  // will connect to Supabase later
+    if (!result) return;
+
+    setSaving(true);
+    setSavedNotice(null);
+
+    try {
+      const hoursNum = parseFloat(hoursWorked) || 0;
+      const rateNum = parseFloat(hourlyRate) || 0;
+
+      const { error } = await supabase.from("payroll_records").insert([
+        {
+          employee_id: employeeId || null,
+          employee_name: employeeName || null,
+
+          hours_worked: hoursNum,
+          hourly_rate: rateNum,
+
+          gross_pay: result.grossPay,
+          cpp: result.cpp,
+          // ei: result.ei,
+          // ft: result.ft,
+          net_pay: result.net,
+
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw error;
+      }
+
+      setSavedNotice("Saved to payroll.");
+    } catch (e: any) {
+      setSavedNotice(`Failed to save: ${e?.message || "unknown error"}`);
+    } finally {
+      setSaving(false);
+    }
   }
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <Card>
