@@ -5,6 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { calcPayroll } from "@/lib/payrollCalc";
+
 
 type CalcResult = {
   grossPay: number;
