@@ -61,6 +61,12 @@ export default function PayrollCalculatorPage() {
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function sanitizePositiveFloat(v: string) {
+    const num = parseFloat(v);
+    if (Number.isNaN(num) || num < 0) return 0;
+    return num;
+  }
+
   function handleCalculate() {
     const h = parseFloat(hoursWorked) || 0;
     const r = parseFloat(hourlyRate) || 0;
