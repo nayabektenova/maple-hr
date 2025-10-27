@@ -146,6 +146,7 @@ export default function PayrollCalculatorPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               type="button"
               onClick={handleCalculate}
+              disabled={!hoursWorked || !hourlyRate}
             >
               Calculate
             </Button>
