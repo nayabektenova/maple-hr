@@ -68,8 +68,8 @@ export default function PayrollCalculatorPage() {
   }
 
   function handleCalculate() {
-    const h = parseFloat(hoursWorked) || 0;
-    const r = parseFloat(hourlyRate) || 0;
+    const h = sanitizePositiveFloat(hoursWorked);
+    const r = sanitizePositiveFloat(hourlyRate);
 
     const payroll = calcPayroll({
       hoursWorked: h,
