@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { calcPayroll } from "@/lib/payrollCalc";
+import { supabase } from "@/lib/supabaseClient";
+
 
 
 type CalcResult = {
