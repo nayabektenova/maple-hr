@@ -11,10 +11,10 @@ import { supabase } from "@/lib/supabaseClient";
 type CalcResult = {
   grossPay: number;
   cpp: number;
-  net: number; // (your current calcPayroll's net; we won't change its logic)
+  ei: number;
+  federalTax: number;
+  net: number;
 };
-
-const EI_RATE = 0.0164; // 1.64%
 
 function Field(props: {
   label: string;
@@ -82,9 +82,6 @@ export default function PayrollCalculatorPage() {
     setSavedNotice(null);
   }
 
-  // derive EI from the current result (gross * 1.64%)
-  const ei = result ? round2((result.grossPay || 0) * EI_RATE) : undefined;
-
   async function handleSave() {
     if (!result) return;
 
@@ -95,6 +92,10 @@ export default function PayrollCalculatorPage() {
       const hoursNum = parseFloat(hoursWorked) || 0;
       const rateNum = parseFloat(hourlyRate) || 0;
 
+      // Ensure your Supabase table has these columns:
+      // employee_id (text), employee_name (text),
+      // hours_worked (numeric), hourly_rate (numeric),
+      // gross_pay (numeric), cpp (numeric), ei (numeric), federal_tax (numeric), net_pay (numeric), created_at (timestamptz)
       const { error } = await supabase.from("payroll_records").insert([
         {
           employee_id: employeeId || null,
@@ -105,10 +106,10 @@ export default function PayrollCalculatorPage() {
 
           gross_pay: result.grossPay,
           cpp: result.cpp,
-          ei: ei ?? 0,             // <-- save EI
-          // ft: result.ft,        // if/when you add tax
+          ei: result.ei,
+          federal_tax: result.federalTax,
+          net_pay: result.net,
 
-          net_pay: result.net,      // (unchanged: uses your calcPayroll's current net)
           created_at: new Date().toISOString(),
         },
       ]);
@@ -134,7 +135,8 @@ export default function PayrollCalculatorPage() {
             Payroll Calculator
           </CardTitle>
           <p className="text-sm text-gray-500">
-            Enter employee info and pay for this pay period. We’ll calculate CPP and EI (1.64%).
+            Enter employee info and pay for this pay period. We’ll calculate CPP (5.95%),
+            EI (1.64%), and Federal Tax (15% estimate).
           </p>
         </CardHeader>
 
@@ -217,12 +219,8 @@ export default function PayrollCalculatorPage() {
                 <Row label="Gross Pay">{money(result?.grossPay)}</Row>
 
                 <Row label="CPP Deduction">{money(result?.cpp)}</Row>
-
-                <Row label="EI Deduction">{money(ei)}</Row>
-
-                {/* Future:
-                <Row label="Tax / FT Deduction">{money(result?.ft)}</Row>
-                */}
+                <Row label="EI Deduction">{money(result?.ei)}</Row>
+                <Row label="Federal Tax Deduction">{money(result?.federalTax)}</Row>
 
                 <Separator className="my-2" />
 
@@ -250,10 +248,6 @@ export default function PayrollCalculatorPage() {
       </Card>
     </div>
   );
-
-  function round2(n: number) {
-    return Math.round(n * 100) / 100;
-  }
 
   function money(n: number | undefined) {
     if (n === undefined || Number.isNaN(n)) return "—";
