@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { calcPayroll } from "@/lib/payrollCalc";
 import { supabase } from "@/lib/supabaseClient";
 
-
-
 type CalcResult = {
   grossPay: number;
   cpp: number;
+  ei: number;
+  federalTax: number;
   net: number;
 };
 
@@ -82,8 +82,6 @@ export default function PayrollCalculatorPage() {
     setSavedNotice(null);
   }
 
-
-
   async function handleSave() {
     if (!result) return;
 
@@ -94,6 +92,10 @@ export default function PayrollCalculatorPage() {
       const hoursNum = parseFloat(hoursWorked) || 0;
       const rateNum = parseFloat(hourlyRate) || 0;
 
+      // Ensure your Supabase table has these columns:
+      // employee_id (text), employee_name (text),
+      // hours_worked (numeric), hourly_rate (numeric),
+      // gross_pay (numeric), cpp (numeric), ei (numeric), federal_tax (numeric), net_pay (numeric), created_at (timestamptz)
       const { error } = await supabase.from("payroll_records").insert([
         {
           employee_id: employeeId || null,
@@ -104,8 +106,8 @@ export default function PayrollCalculatorPage() {
 
           gross_pay: result.grossPay,
           cpp: result.cpp,
-          // ei: result.ei,
-          // ft: result.ft,
+          ei: result.ei,
+          federal_tax: result.federalTax,
           net_pay: result.net,
 
           created_at: new Date().toISOString(),
@@ -133,8 +135,8 @@ export default function PayrollCalculatorPage() {
             Payroll Calculator
           </CardTitle>
           <p className="text-sm text-gray-500">
-            Enter employee info and pay for this pay period. We’ll calculate CPP
-            (Canada Pension Plan). EI and tax (FT) are planned but not active yet.
+            Enter employee info and pay for this pay period. We’ll calculate CPP (5.95%),
+            EI (1.64%), and Federal Tax (15% estimate).
           </p>
         </CardHeader>
 
@@ -217,11 +219,8 @@ export default function PayrollCalculatorPage() {
                 <Row label="Gross Pay">{money(result?.grossPay)}</Row>
 
                 <Row label="CPP Deduction">{money(result?.cpp)}</Row>
-
-                {/* Future:
                 <Row label="EI Deduction">{money(result?.ei)}</Row>
-                <Row label="Tax / FT Deduction">{money(result?.ft)}</Row>
-                */}
+                <Row label="Federal Tax Deduction">{money(result?.federalTax)}</Row>
 
                 <Separator className="my-2" />
 
@@ -249,13 +248,9 @@ export default function PayrollCalculatorPage() {
       </Card>
     </div>
   );
-  function round2(n: number) {
-    return Math.round(n * 100) / 100;
-  }
 
   function money(n: number | undefined) {
     if (n === undefined || Number.isNaN(n)) return "—";
     return `$${n.toFixed(2)}`;
   }
-
 }

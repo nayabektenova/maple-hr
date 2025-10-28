@@ -1,3 +1,4 @@
+// lib/payrollCalc.ts
 export type PayrollInputs = {
   hoursWorked: number;
   hourlyRate: number;
@@ -6,31 +7,37 @@ export type PayrollInputs = {
 export type PayrollOutputs = {
   grossPay: number;
   cpp: number;
-  // ei?: number; // future
-  // ft?: number; // future (tax)
+  ei: number;
+  federalTax: number;
   net: number;
 };
 
 export function calcPayroll({ hoursWorked, hourlyRate }: PayrollInputs): PayrollOutputs {
   const grossPay = hoursWorked * hourlyRate;
 
-  // CPP placeholder ~5.95%, real CPP will consider yearly max + basic exemption
+  // CPP (placeholder): 5.95% of gross
   const cppRate = 0.0595;
   const cpp = grossPay * cppRate;
 
-  // const ei = ...
-  // const ft = ...
+  // EI: 1.64% of gross
+  const eiRate = 0.0164;
+  const ei = grossPay * eiRate;
 
-  const net = grossPay - cpp;
+  // Federal tax (simple 15% flat for this estimate)
+  const federalTaxRate = 0.15;
+  const federalTax = grossPay * federalTaxRate;
+
+  const net = grossPay - (cpp + ei + federalTax);
 
   return {
     grossPay: round2(grossPay),
     cpp: round2(cpp),
+    ei: round2(ei),
+    federalTax: round2(federalTax),
     net: round2(net),
   };
 }
 
-// local util
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
