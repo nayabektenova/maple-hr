@@ -23,10 +23,19 @@ export function calcPayroll({ hoursWorked, hourlyRate }: PayrollInputs): Payroll
   const eiRate = 0.0164;
   const ei = grossPay * eiRate;
 
-  // Federal tax (simple 15% flat for this estimate)
-  const federalTaxRate = 0.15;
-  const federalTax = grossPay * federalTaxRate;
+  // Federal Tax (this is the custom logic which was discussed in group )
+  let federalTax = 0;
+  const exemptionThreshold = 605;
+  const federalTaxRate = 0.145; // 14.5%
 
+  if (grossPay > exemptionThreshold) {
+    const exemptionAmount = grossPay - exemptionThreshold;
+    federalTax = exemptionAmount * federalTaxRate;
+  } else {
+    federalTax = 0;
+  }
+
+  // Net pay after all deductions
   const net = grossPay - (cpp + ei + federalTax);
 
   return {
