@@ -38,6 +38,7 @@ const CustomSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
  * - Boxes show: Name, Role, Position (darker & bolder)
  * - Decorative SVG lines connect levels
  */
+// ======================= Component ========================
 export default function EmployeeHierarchy() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
