@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { calcPayroll } from "@/lib/payrollCalc";
 import { supabase } from "@/lib/supabaseClient";
 
-
-
 type CalcResult = {
   grossPay: number;
   cpp: number;
-  net: number;
+  net: number; // (your current calcPayroll's net; we won't change its logic)
 };
+
+const EI_RATE = 0.0164; // 1.64%
 
 function Field(props: {
   label: string;
@@ -82,7 +82,8 @@ export default function PayrollCalculatorPage() {
     setSavedNotice(null);
   }
 
-
+  // derive EI from the current result (gross * 1.64%)
+  const ei = result ? round2((result.grossPay || 0) * EI_RATE) : undefined;
 
   async function handleSave() {
     if (!result) return;
@@ -104,10 +105,10 @@ export default function PayrollCalculatorPage() {
 
           gross_pay: result.grossPay,
           cpp: result.cpp,
-          // ei: result.ei,
-          // ft: result.ft,
-          net_pay: result.net,
+          ei: ei ?? 0,             // <-- save EI
+          // ft: result.ft,        // if/when you add tax
 
+          net_pay: result.net,      // (unchanged: uses your calcPayroll's current net)
           created_at: new Date().toISOString(),
         },
       ]);
@@ -133,8 +134,7 @@ export default function PayrollCalculatorPage() {
             Payroll Calculator
           </CardTitle>
           <p className="text-sm text-gray-500">
-            Enter employee info and pay for this pay period. We’ll calculate CPP
-            (Canada Pension Plan). EI and tax (FT) are planned but not active yet.
+            Enter employee info and pay for this pay period. We’ll calculate CPP and EI (1.64%).
           </p>
         </CardHeader>
 
@@ -218,8 +218,9 @@ export default function PayrollCalculatorPage() {
 
                 <Row label="CPP Deduction">{money(result?.cpp)}</Row>
 
+                <Row label="EI Deduction">{money(ei)}</Row>
+
                 {/* Future:
-                <Row label="EI Deduction">{money(result?.ei)}</Row>
                 <Row label="Tax / FT Deduction">{money(result?.ft)}</Row>
                 */}
 
@@ -249,6 +250,7 @@ export default function PayrollCalculatorPage() {
       </Card>
     </div>
   );
+
   function round2(n: number) {
     return Math.round(n * 100) / 100;
   }
@@ -257,5 +259,4 @@ export default function PayrollCalculatorPage() {
     if (n === undefined || Number.isNaN(n)) return "—";
     return `$${n.toFixed(2)}`;
   }
-
 }
