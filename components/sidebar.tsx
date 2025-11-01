@@ -15,11 +15,12 @@ import {
   FileIcon as FileUser,
   ClipboardList,
   Sparkles,
+  Bell,
 } from "lucide-react"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Announcement", href: "/announcement", icon: Users },
+  { name: "Announcement", href: "/announcement", icon: Bell },
   { name: "Schedule", href: "/schedule", icon: Calendar },
   { name: "Employees", href: "/employees", icon: Users },
   { name: "Employees Hierarchy", href: "/employee-hierarchy", icon: Users },
