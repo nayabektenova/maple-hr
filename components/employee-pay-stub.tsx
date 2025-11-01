@@ -1,3 +1,5 @@
+// Prompt in microsoft Edge Copilot: handles the supabase errors, tell me to completethe formule part of the code in components/employee-pay-stub.tsx
+
 "use client";
 
 import * as React from "react";
@@ -205,7 +207,7 @@ export default function EmployeePayStub() {
     const next = [...stubs, newStub];
     saveStubs(next);
     setStubs(next);
-    setLastCalc(newStub); // ✅ show new calculation immediately
+    setLastCalc(newStub); // show new calculation immediately
     setGenNotice("Paystub generated and saved.");
     setTimeout(() => setGenNotice(null), 2400);
     resetGen();

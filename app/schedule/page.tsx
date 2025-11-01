@@ -10,4 +10,3 @@ export default function SchedulePage() {
     </div>
   )
 }
-// these are the code done by naya benkotava

@@ -210,7 +210,7 @@ export function SurveyList() {
         if (questionsError) throw questionsError
       }
 
-      // 3️⃣ Update local state & show success banner
+      // Update local state & show success banner
       const entry = { ...draft, status: "published" as const }
       setSurveysCatalog((prev) => {
         const i = prev.findIndex((s) => s.id === entry.id)
