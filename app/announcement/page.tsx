@@ -1,4 +1,4 @@
-import AnnouncementList from "@/components/announcement"
+import { AnnouncementList } from "@/components/announcement"
 
 export default function AnnouncementPage() {
   return (
