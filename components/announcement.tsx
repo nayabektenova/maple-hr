@@ -186,9 +186,9 @@ function CreateAnnouncementModal({
       due_at: dueAt ? formatDate(dueAt) : null,
     };
 
-    if (userData?.user?.id) {
-      payload.created_by = userData.user.id;
-    }
+    // if (userData?.user?.id) {
+    //   payload.created_by = userData.user.id;
+    // }
 
     console.log("Inserting payload:", payload);
 
