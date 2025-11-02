@@ -143,74 +143,162 @@ function CreateAnnouncementModal({
   }
 
   async function handleSubmit(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!title.trim()) {
-      alert("Title is required");
+  if (e) e.preventDefault();
+  if (!title.trim()) {
+    alert("Title is required");
+    return;
+  }
+  setSaving(true);
+  try {
+    let attachment_url: string | null = null;
+    if (attachmentFile) {
+      try {
+        attachment_url = await handleFileUpload(attachmentFile);
+      } catch (err) {
+        console.warn("attachment upload failed, continuing without it", err);
+        attachment_url = null;
+      }
+    }
+
+    // Get current user
+    const { data: userData } = await supabase.auth.getUser();
+
+    // Format datetime properly for Supabase (ISO 8601 format)
+    const formatDateTime = (dateTimeStr: string) => {
+      if (!dateTimeStr) return null;
+      return new Date(dateTimeStr).toISOString();
+    };
+
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return null;
+      return new Date(dateStr + 'T00:00:00').toISOString();
+    };
+
+    const payload: any = {
+      title: title.trim(),
+      body: body.trim() || null,
+      type,
+      pinned,
+      department: department || null,
+      attachment_url,
+      join_link: joinLink.trim() || null,
+      start_at: startAt ? formatDateTime(startAt) : null,
+      due_at: dueAt ? formatDate(dueAt) : null,
+    };
+
+    if (userData?.user?.id) {
+      payload.created_by = userData.user.id;
+    }
+
+    console.log("Inserting payload:", payload);
+
+    const { data, error } = await supabase
+      .from("announcements")
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Insert announcement error:", error);
+      alert(`Failed to create announcement: ${error.message}\nDetails: ${JSON.stringify(error.details || {})}`);
       return;
     }
-    setSaving(true);
-    try {
-      let attachment_url: string | null = null;
-      if (attachmentFile) {
-        try {
-          attachment_url = await handleFileUpload(attachmentFile);
-        } catch (err) {
-          console.warn("attachment upload failed, continuing without it", err);
-          attachment_url = null;
-        }
-      }
 
-      const payload: any = {
-        title: title.trim(),
-        body: body.trim(),
-        type,
-        pinned,
-        department: department || null,
-        attachment_url,
-        join_link: joinLink || null,
-        start_at: startAt || null,
-        due_at: dueAt || null,
+    if (data) {
+      const created: Announcement = {
+        id: data.id,
+        title: data.title,
+        body: data.body,
+        type: data.type,
+        created_by: data.created_by,
+        created_at: data.created_at,
+        start_at: data.start_at,
+        due_at: data.due_at,
+        attachment_url: data.attachment_url,
+        join_link: data.join_link,
+        pinned: !!data.pinned,
+        department: data.department ?? null,
       };
-
-      // created_by will be set on server based on auth user or use client: attempt to get user
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user?.id) payload.created_by = userData.user.id;
-
-      const { data, error } = await supabase
-        .from("announcements")
-        .insert([payload])
-        .select()
-        .single();
-
-      if (error) {
-        console.error("insert announcement error", error);
-        alert("Failed to create announcement. See console.");
-      } else {
-        // notify parent to refresh
-        const created: Announcement = {
-          id: data.id,
-          title: data.title,
-          body: data.body,
-          type: data.type,
-          created_by: data.created_by,
-          created_at: data.created_at,
-          start_at: data.start_at,
-          due_at: data.due_at,
-          attachment_url: data.attachment_url,
-          join_link: data.join_link,
-          pinned: !!data.pinned,
-          department: data.department ?? null,
-        };
-        onCreated(created);
-        onClose();
-      }
-    } catch (err) {
-      console.error("unexpected create error", err);
-      alert("Unexpected error creating announcement.");
-    } finally {
-      setSaving(false);
+      onCreated(created);
+      onClose();
     }
+  } catch (err: any) {
+    console.error("Unexpected create error:", err);
+    alert(`Unexpected error creating announcement: ${err.message || err}`);
+  } finally {
+    setSaving(false);
   }
+}
+
+  // async function handleSubmit(e?: React.FormEvent) {
+  //   if (e) e.preventDefault();
+  //   if (!title.trim()) {
+  //     alert("Title is required");
+  //     return;
+  //   }
+  //   setSaving(true);
+  //   try {
+  //     let attachment_url: string | null = null;
+  //     if (attachmentFile) {
+  //       try {
+  //         attachment_url = await handleFileUpload(attachmentFile);
+  //       } catch (err) {
+  //         console.warn("attachment upload failed, continuing without it", err);
+  //         attachment_url = null;
+  //       }
+  //     }
+
+  //     const payload: any = {
+  //       title: title.trim(),
+  //       body: body.trim(),
+  //       type,
+  //       pinned,
+  //       department: department || null,
+  //       attachment_url,
+  //       join_link: joinLink || null,
+  //       start_at: startAt || null,
+  //       due_at: dueAt || null,
+  //     };
+
+  //     // created_by will be set on server based on auth user or use client: attempt to get user
+  //     const { data: userData } = await supabase.auth.getUser();
+  //     if (userData?.user?.id) payload.created_by = userData.user.id;
+
+  //     const { data, error } = await supabase
+  //       .from("announcements")
+  //       .insert([payload])
+  //       .select()
+  //       .single();
+
+  //     if (error) {
+  //       console.error("insert announcement error", error);
+  //       alert("Failed to create announcement. See console.");
+  //     } else {
+  //       // notify parent to refresh
+  //       const created: Announcement = {
+  //         id: data.id,
+  //         title: data.title,
+  //         body: data.body,
+  //         type: data.type,
+  //         created_by: data.created_by,
+  //         created_at: data.created_at,
+  //         start_at: data.start_at,
+  //         due_at: data.due_at,
+  //         attachment_url: data.attachment_url,
+  //         join_link: data.join_link,
+  //         pinned: !!data.pinned,
+  //         department: data.department ?? null,
+  //       };
+  //       onCreated(created);
+  //       onClose();
+  //     }
+  //   } catch (err) {
+  //     console.error("unexpected create error", err);
+  //     alert("Unexpected error creating announcement.");
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // }
 
   if (!open) return null;
 
