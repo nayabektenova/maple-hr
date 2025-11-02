@@ -161,7 +161,9 @@ function CreateAnnouncementModal({
     }
 
     // Get current user
-    const { data: userData } = await supabase.auth.getUser();
+    // const { data: userData } = await supabase.auth.getUser();
+
+    /* this part needed to be fixed and i fixed this bescaues we are not saveing the information in our table where the created_by doesnot exist */
 
     // Format datetime properly for Supabase (ISO 8601 format)
     const formatDateTime = (dateTimeStr: string) => {
