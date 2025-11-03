@@ -39,6 +39,7 @@ const navigation = [
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
   { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
+  { name: "Admin Benefits", href: "/admin/benefits", icon: Sparkles },
 ]
 
 export function Sidebar() {
