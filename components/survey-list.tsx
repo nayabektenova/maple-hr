@@ -390,6 +390,100 @@ export function SurveyList() {
                       </div>
                     )}
                   </div>
+
+                    {/* Questions */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Questions</Label>
+                      <Button variant="outline" size="sm" onClick={addQuestion}>
+                        <Plus className="w-4 h-4 mr-1" /> Add question
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {draft.questions.map((q, idx) => (
+                        <div key={q.id} className="rounded-md border border-gray-200 p-3">
+                          <div className="flex items-center gap-3">
+                            <Select
+                              value={q.type}
+                              onValueChange={(v: any) => {
+                                const next: Partial<Question> = { type: v }
+                                if (v === "multi_choice" && !q.options) next.options = ["Option 1", "Option 2"]
+                                if (v !== "multi_choice") next.options = undefined
+                                updateQuestion(q.id, next)
+                              }}
+                            >
+                              <SelectTrigger className="w-44">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="short_text">Short text</SelectItem>
+                                <SelectItem value="long_text">Long text</SelectItem>
+                                <SelectItem value="rating">Rating (1–5)</SelectItem>
+                                <SelectItem value="multi_choice">Multiple choice</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <Input
+                              className="flex-1"
+                              placeholder={`Question ${idx + 1} prompt`}
+                              value={q.prompt}
+                              onChange={(e) => updateQuestion(q.id, { prompt: e.target.value })}
+                            />
+
+                            <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} aria-label="Remove question">
+                              <Trash2 className="w-4 h-4 text-gray-500" />
+                            </Button>
+                          </div>
+
+                          {q.type === "multi_choice" && (
+                            <div className="mt-3 space-y-2">
+                              {(q.options ?? []).map((opt, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <Input
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const opts = [...(q.options ?? [])]
+                                      opts[i] = e.target.value
+                                      updateQuestion(q.id, { options: opts })
+                                    }}
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const opts = (q.options ?? []).filter((_, j) => j !== i)
+                                      updateQuestion(q.id, { options: opts })
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ))}
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateQuestion(q.id, { options: [...(q.options ?? []), "New option"] })}
+                              >
+                                + Add option
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <DialogFooter className="mt-4">
+                    <Button variant="outline" onClick={saveDraft}>Save draft</Button>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish} disabled={loading}>
+                      {loading ? "Publishing..." : "Create & publish"}
+                    </Button>
+                  </DialogFooter>
+
+
+
                 </div>
               </DialogContent>
 
