@@ -26,8 +26,10 @@ const navigation = [
   { name: "Employees Hierarchy", href: "/employee-hierarchy", icon: Users },
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Leaves", href: "/leaves", icon: Plane },
+  { name: "PayStub", href: "/paystub", icon: DollarSign },
   { name: "Finances", href: "/finances", icon: DollarSign },
   { name: "Survey", href: "/survey", icon: MessageSquare },
+  { name: "Survey Employee", href: "/survey-employee", icon: MessageSquare },
   { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
   { name: "Requests", href: "/admin/requests", icon: ClipboardList },
   { name: "Employee List", href: "/admin/viewemployee", icon: FileUser },
@@ -57,7 +59,7 @@ export function Sidebar() {
       <nav className="flex-1 p-4">
         <ul className="space-y-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/")
+            const isActive = item.href === "/" ? pathname === "/" : (pathname === item.href || pathname.startsWith(`${item.href}/`))
             return (
               <li key={item.name}>
                 <Link
