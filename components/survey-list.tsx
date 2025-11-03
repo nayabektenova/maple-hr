@@ -60,3 +60,14 @@ const SURVEY_TYPES: Array<string> = ["Team Satisfaction", "Manager feedback", "I
 const STATUSES: Array<SurveyRow["status"]> = ["Submitted", "Pending", "In progress"]
 const REVIEW_STATUSES: Array<SurveyRow["reviewStatus"]> = ["Reviewed", "Pending", "Pending Review"]
 const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
+
+
+export function SurveyList() {
+  const [search, setSearch] = useState("")
+  const [surveyFilter, setSurveyFilter] = useState<string | "">("")
+  const [statusFilter, setStatusFilter] = useState<SurveyRow["status"] | "">("")
+  const [reviewFilter, setReviewFilter] = useState<SurveyRow["reviewStatus"] | "">("")
+
+  // временный return (заменим позже)
+  return <div />
+}
