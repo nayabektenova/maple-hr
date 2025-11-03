@@ -96,4 +96,35 @@ export function SurveyList() {
     }
   }
 
+
+  useEffect(() => {
+    fetchResponses()
+  }, [])
+
+  async function fetchResponses() {
+    setLoadingRows(true)
+    const { data, error } = await supabase
+      .from("survey_responses")
+      .select("id, first_name, last_name, survey, status, submission_date, review_status, notes")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error loading survey responses:", error)
+      setRows([])
+    } else {
+      const mapped: SurveyRow[] = (data || []).map((r: any) => ({
+        id: r.id,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        survey: r.survey,
+        status: r.status,
+        submissionDate: r.submission_date ? new Date(r.submission_date).toLocaleDateString() : "Pending",
+        reviewStatus: r.review_status,
+        notes: r.notes ?? undefined,
+      }))
+      setRows(mapped)
+    }
+    setLoadingRows(false)
+  }
+
 }
