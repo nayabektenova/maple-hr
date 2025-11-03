@@ -139,4 +139,32 @@ export function SurveyList() {
     })
   }, [rows, search, surveyFilter, statusFilter, reviewFilter])
 
+
+  function addQuestion() {
+    setDraft((d) => ({
+      ...d,
+      questions: [...d.questions, { id: cryptoRandomId(), type: "short_text", prompt: "" }],
+    }))
+  }
+
+  function removeQuestion(id: string) {
+    setDraft((d) => ({ ...d, questions: d.questions.filter((q) => q.id !== id) }))
+  }
+
+  function updateQuestion(id: string, next: Partial<Question>) {
+    setDraft((d) => ({
+      ...d,
+      questions: d.questions.map((q) => (q.id === id ? { ...q, ...next } : q)),
+    }))
+  }
+
+  function setAudience(a: SurveyDraft["audience"]) {
+    setDraft((d) => ({
+      ...d,
+      audience: a,
+      department: a === "department" ? d.department : "",
+      employees: a === "individuals" ? d.employees : [],
+    }))
+  }
+
 }
