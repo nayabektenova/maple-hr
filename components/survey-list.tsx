@@ -234,4 +234,86 @@ export function SurveyList() {
 
 
 
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
+        {showCreatedBanner && (
+          <div className="mb-2 rounded-md border border-green-200 bg-green-50 text-green-800 px-3 py-2 text-sm">
+            <strong>{showCreatedBanner.name}</strong> has been published and saved to the database.
+          </div>
+        )}
+
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search by ID, Name, Email"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                <Filter className="h-4 w-4" />
+                Filters
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuLabel>Survey Name</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setSurveyFilter("")}>All</DropdownMenuItem>
+              {SURVEY_TYPES.map((t) => (
+                <DropdownMenuItem key={t} onClick={() => setSurveyFilter(t)}>
+                  {t}
+                </DropdownMenuItem>
+              ))}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setStatusFilter("")}>All</DropdownMenuItem>
+              {STATUSES.map((s) => (
+                <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}>
+                  {s}
+                </DropdownMenuItem>
+              ))}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Review status</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setReviewFilter("")}>All</DropdownMenuItem>
+              {REVIEW_STATUSES.map((s) => (
+                <DropdownMenuItem key={s} onClick={() => setReviewFilter(s)}>
+                  {s}
+                </DropdownMenuItem>
+              ))}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setSurveyFilter(""); setStatusFilter(""); setReviewFilter("") }}>
+                Clear filters
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="ml-auto">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create survey
+                </Button>
+              </DialogTrigger>
+
+              
+            </Dialog>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
+
+
+
 }
