@@ -68,6 +68,10 @@ export function SurveyList() {
   const [statusFilter, setStatusFilter] = useState<SurveyRow["status"] | "">("")
   const [reviewFilter, setReviewFilter] = useState<SurveyRow["reviewStatus"] | "">("")
 
-  // временный return (заменим позже)
-  return <div />
+  const [rows, setRows] = useState<SurveyRow[]>([])
+  const [loadingRows, setLoadingRows] = useState(true)
+
+  const [surveysCatalog, setSurveysCatalog] = useState<SurveyDraft[]>([])
+  const [showCreatedBanner, setShowCreatedBanner] = useState<{ id: string; name: string } | null>(null)
+
 }
