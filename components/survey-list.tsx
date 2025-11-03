@@ -1,56 +1,44 @@
+// components/survey-list.tsx
 "use client"
 
-import { useMemo, useState } from "react"
-import { Search, Filter, Plus, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { createClient } from "@supabase/supabase-js"
+import { Search, Filter, Plus, Trash2, Pencil, Eye } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  DialogFooter, DialogTrigger
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { createClient } from "@supabase/supabase-js"
 
-/* ======================== Supabase Client ======================== */
+/* -------------------- helpers -------------------- */
+
+const newId = () => {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      // @ts-ignore
+      return crypto.randomUUID()
+    }
+  } catch {}
+  return Math.random().toString(36).slice(2)
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-/* ======================== Types ======================== */
-type SurveyRow = {
-  id: string
-  firstName: string
-  lastName: string
-  survey: "Team Satisfaction" | "Manager feedback" | "Improvement Suggestions" | string
-  status: "Submitted" | "Pending" | "In progress"
-  submissionDate: string
-  reviewStatus: "Reviewed" | "Pending" | "Pending Review"
-  notes?: string
-}
+/* -------------------- types -------------------- */
 
 type QuestionType = "short_text" | "long_text" | "rating" | "multi_choice"
 
@@ -73,43 +61,124 @@ type SurveyDraft = {
   status: "draft" | "published"
 }
 
-/* ======================== Demo data ======================== */
-const rowsSeed: SurveyRow[] = [
-  { id: "1", firstName: "Saul", lastName: "Mullins", survey: "Team Satisfaction", status: "Submitted", submissionDate: "03/07/2025", reviewStatus: "Reviewed" },
-  { id: "2", firstName: "Amirah", lastName: "Vincent", survey: "Manager feedback", status: "Pending", submissionDate: "Pending", reviewStatus: "Pending", notes: "On vacation" },
-  { id: "3", firstName: "Morgan", lastName: "Terrell", survey: "Improvement Suggestions", status: "In progress", submissionDate: "Pending", reviewStatus: "Pending" },
-  { id: "4", firstName: "Henrietta",lastName: "Gibbs",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
-  { id: "5", firstName: "Enzo",     lastName: "Cobb",     survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "6", firstName: "Fintan",   lastName: "Huff",     survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "7", firstName: "Lena",     lastName: "Dixon",    survey: "Manager feedback",         status: "Submitted",  submissionDate: "01/07/2025", reviewStatus: "Pending Review" },
-  { id: "8", firstName: "Cole",     lastName: "Stanton",  survey: "Improvement Suggestions",  status: "Pending",    submissionDate: "Pending",    reviewStatus: "Pending" },
-  { id: "9", firstName: "Cole",     lastName: "Stanton",  survey: "Team Satisfaction",        status: "In progress",submissionDate: "Pending",    reviewStatus: "Pending" },
-]
+type ResponseRow = {
+  id: string                 // survey_responses.id
+  firstName: string
+  lastName: string
+  surveyName: string
+  viewed: boolean            // local-only "viewed" tag for UI
+}
 
-const SURVEY_TYPES: Array<SurveyRow["survey"]> = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
-const STATUSES: SurveyRow["status"][] = ["Submitted", "Pending", "In progress"]
-const REVIEW_STATUSES: SurveyRow["reviewStatus"][] = ["Reviewed", "Pending", "Pending Review"]
+type SurveyRow = {
+  id: string                 // surveys.id
+  name: string
+  description?: string | null
+  due_date?: string | null
+  audience: "all" | "department" | "individuals"
+  department?: string | null
+  employees?: string[] | null
+}
 
+/* -------------------- constants -------------------- */
+
+const SURVEY_TYPES = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
 const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
 
-/* ======================== Component ======================== */
+/* ===================================================
+   Main component
+=================================================== */
+
 export function SurveyList() {
+  /* ---------- left: responses ---------- */
   const [search, setSearch] = useState("")
-  const [surveyFilter, setSurveyFilter] = useState<SurveyRow["survey"] | "">("")
-  const [statusFilter, setStatusFilter] = useState<SurveyRow["status"] | "">("")
-  const [reviewFilter, setReviewFilter] = useState<SurveyRow["reviewStatus"] | "">("")
-  const [rows] = useState<SurveyRow[]>(rowsSeed)
+  const [rows, setRows] = useState<ResponseRow[]>([])
+  const [loadingRows, setLoadingRows] = useState(true)
 
-  const [surveysCatalog, setSurveysCatalog] = useState<SurveyDraft[]>([])
-  const [showCreatedBanner, setShowCreatedBanner] = useState<{id: string; name: string} | null>(null)
+  /* ---------- right: surveys ---------- */
+  const [surveys, setSurveys] = useState<SurveyRow[]>([])
+  const [loadingSurveys, setLoadingSurveys] = useState(true)
 
-  const [open, setOpen] = useState(false)
+  /* ---------- create/edit dialogs ---------- */
+  const [openCreate, setOpenCreate] = useState(false)
+  const [loadingCreate, setLoadingCreate] = useState(false)
+  const [showCreatedBanner, setShowCreatedBanner] = useState<{ id: string; name: string } | null>(null)
+
   const [draft, setDraft] = useState<SurveyDraft>(() => blankDraft())
-  const [loading, setLoading] = useState(false)
+
+  const [openEdit, setOpenEdit] = useState(false)
+  const [editSurveyId, setEditSurveyId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<SurveyDraft | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  /* ---------- response answers dialog ---------- */
+  const [openAnswers, setOpenAnswers] = useState(false)
+  const [answersLoading, setAnswersLoading] = useState(false)
+  const [answersTitle, setAnswersTitle] = useState<string>("Employee Answers")
+  const [answers, setAnswers] = useState<Array<{ prompt: string; value: string }>>([])
+
+  /* ---------- effects ---------- */
+  useEffect(() => {
+    fetchResponses()
+    fetchSurveys()
+  }, [])
+
+  /* ===================================================
+     Fetchers
+  =================================================== */
+
+  async function fetchResponses() {
+    setLoadingRows(true)
+    // get responses with joined survey name
+    // Requires FK survey_responses.survey_id -> surveys.id
+    const { data, error } = await supabase
+      .from("survey_responses")
+      .select(`
+        id,
+        first_name,
+        last_name,
+        surveys!inner ( name )
+      `)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error loading responses:", error)
+      setRows([])
+    } else {
+      const mapped: ResponseRow[] = (data || []).map((r: any) => ({
+        id: r.id,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        surveyName: r.surveys?.[0]?.name ?? r.surveys?.name ?? "(unknown)",
+        viewed: false,
+      }))
+      setRows(mapped)
+    }
+    setLoadingRows(false)
+  }
+
+  async function fetchSurveys() {
+    setLoadingSurveys(true)
+    const { data, error } = await supabase
+      .from("surveys")
+      .select("id, name, description, due_date, audience, department, employees")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error loading surveys:", error)
+      setSurveys([])
+    } else {
+      setSurveys(data as SurveyRow[])
+    }
+    setLoadingSurveys(false)
+  }
+
+  /* ===================================================
+     Draft helpers
+  =================================================== */
 
   function blankDraft(): SurveyDraft {
     return {
-      id: cryptoRandomId(),
+      id: newId(),
       name: "",
       description: "",
       audience: "all",
@@ -117,416 +186,626 @@ export function SurveyList() {
       employees: [],
       dueDate: "",
       questions: [
-        { id: cryptoRandomId(), type: "short_text", prompt: "What’s going well?" },
-        { id: cryptoRandomId(), type: "long_text", prompt: "Any challenges you’d like to share?" },
-        { id: cryptoRandomId(), type: "rating", prompt: "Rate your overall satisfaction (1-5)" },
+        { id: newId(), type: "short_text", prompt: "What’s going well?" },
+        { id: newId(), type: "long_text", prompt: "Any challenges you’d like to share?" },
+        { id: newId(), type: "rating", prompt: "Rate your overall satisfaction (1-5)" },
       ],
       status: "draft",
     }
   }
 
-  const visibleRows = useMemo(() => {
-    return rows.filter((r) => {
-      const q = `${r.firstName} ${r.lastName}`.toLowerCase()
-      const matchesQuery = q.includes(search.toLowerCase()) || r.id.includes(search)
-      const matchesSurvey = surveyFilter ? r.survey === surveyFilter : true
-      const matchesStatus = statusFilter ? r.status === statusFilter : true
-      const matchesReview = reviewFilter ? r.reviewStatus === reviewFilter : true
-      return matchesQuery && matchesSurvey && matchesStatus && matchesReview
-    })
-  }, [rows, search, surveyFilter, statusFilter, reviewFilter])
-
-  function addQuestion() {
-    setDraft((d) => ({
-      ...d,
-      questions: [...d.questions, { id: cryptoRandomId(), type: "short_text", prompt: "" }],
+  function addQuestion(d: SurveyDraft, setD: (updater: any) => void) {
+    setD((curr: SurveyDraft) => ({
+      ...curr,
+      questions: [...curr.questions, { id: newId(), type: "short_text", prompt: "" }],
     }))
   }
-
-  function removeQuestion(id: string) {
-    setDraft((d) => ({ ...d, questions: d.questions.filter((q) => q.id !== id) }))
+  function removeQuestion(d: SurveyDraft, setD: (updater: any) => void, qid: string) {
+    setD((curr: SurveyDraft) => ({ ...curr, questions: curr.questions.filter((q) => q.id !== qid) }))
   }
-
-  function updateQuestion(id: string, next: Partial<Question>) {
-    setDraft((d) => ({
-      ...d,
-      questions: d.questions.map((q) => (q.id === id ? { ...q, ...next } : q)),
+  function updateQuestion(d: SurveyDraft, setD: (updater: any) => void, qid: string, next: Partial<Question>) {
+    setD((curr: SurveyDraft) => ({
+      ...curr,
+      questions: curr.questions.map((q) => (q.id === qid ? { ...q, ...next } : q)),
     }))
   }
-
-  function setAudience(a: SurveyDraft["audience"]) {
-    setDraft((d) => ({
-      ...d,
+  function setAudience(d: SurveyDraft, setD: (updater: any) => void, a: SurveyDraft["audience"]) {
+    setD((curr: SurveyDraft) => ({
+      ...curr,
       audience: a,
-      department: a === "department" ? d.department : "",
-      employees: a === "individuals" ? d.employees : [],
+      department: a === "department" ? curr.department : "",
+      employees: a === "individuals" ? curr.employees : [],
     }))
   }
 
-  function saveDraft() {
-    const entry = { ...draft, status: "draft" as const }
-    setSurveysCatalog((prev) => {
-      const i = prev.findIndex((s) => s.id === entry.id)
-      if (i >= 0) {
-        const copy = [...prev]; copy[i] = entry; return copy
-      }
-      return [entry, ...prev]
-    })
-    setDraft(blankDraft())
-    setOpen(false)
-  }
+  /* ===================================================
+     Create & publish
+  =================================================== */
 
-  /* ================== CREATE & PUBLISH with Supabase ================== */
   async function createAndPublish() {
-    setLoading(true)
+    setLoadingCreate(true)
     try {
-      // Insert survey into Survey table
+      // 1) create survey
       const { data: surveyData, error: surveyError } = await supabase
-        .from("survey")
-        .insert([{
-          survey_name: draft.name,
-          description: draft.description,
-          due_date: draft.dueDate || null,
-          audience: draft.audience,
-        }])
-        .select("survey_id")
+        .from("surveys")
+        .insert([
+          {
+            name: draft.name,
+            description: draft.description,
+            due_date: draft.dueDate || null,
+            audience: draft.audience,
+            department: draft.audience === "department" ? (draft.department || null) : null,
+            employees: draft.audience === "individuals" ? (draft.employees ?? null) : null,
+            status: "published",
+          },
+        ])
+        .select("id, name")
         .single()
 
       if (surveyError) throw surveyError
-      const surveyId = surveyData.survey_id
+      const surveyId: string = surveyData.id
 
-      // Insert related questions into Questions table
+      // 2) create questions
       if (draft.questions.length > 0) {
-        const questionInserts = draft.questions.map((q) => ({
+        const inserts = draft.questions.map((q) => ({
           survey_id: surveyId,
           question_type: q.type,
-          question_title: q.prompt,
+          prompt: q.prompt,
+          options: q.type === "multi_choice" ? (q.options ?? []) : null,
         }))
-
-        const { error: questionsError } = await supabase
-          .from("questions")
-          .insert(questionInserts)
-
-        if (questionsError) throw questionsError
+        const { error: qErr } = await supabase.from("survey_questions").insert(inserts)
+        if (qErr) throw qErr
       }
 
-      // Update local state & show success banner
-      const entry = { ...draft, status: "published" as const }
-      setSurveysCatalog((prev) => {
-        const i = prev.findIndex((s) => s.id === entry.id)
-        const next = i >= 0 ? prev.map((s) => (s.id === entry.id ? entry : s)) : [entry, ...prev]
-        return next
-      })
-      setShowCreatedBanner({ id: entry.id, name: entry.name || "Untitled survey" })
+      // UI update
+      setShowCreatedBanner({ id: surveyId, name: surveyData.name || "Untitled survey" })
       setDraft(blankDraft())
-      setOpen(false)
+      setOpenCreate(false)
       setTimeout(() => setShowCreatedBanner(null), 4000)
-    } catch (err) {
-      console.error("Error publishing survey:", err)
-      alert("Failed to publish survey. Check console for details.")
+
+      await Promise.all([fetchSurveys(), fetchResponses()])
+    } catch (err: any) {
+      console.error("Error publishing survey:", err?.message || err)
+      alert(`Failed to publish survey: ${err?.message || "unknown error"}`)
     } finally {
-      setLoading(false)
+      setLoadingCreate(false)
     }
   }
 
-  /* ======================== Render ======================== */
+  /* ===================================================
+     Edit survey (right side)
+  =================================================== */
+
+  async function openEditSurvey(sid: string) {
+    setSavingEdit(false)
+    setEditSurveyId(sid)
+    // load survey & questions
+    const [{ data: sData, error: sErr }, { data: qData, error: qErr }] = await Promise.all([
+      supabase.from("surveys").select("*").eq("id", sid).single(),
+      supabase.from("survey_questions").select("id, question_type, prompt, options").eq("survey_id", sid).order("id"),
+    ])
+    if (sErr) {
+      console.error(sErr)
+      alert("Failed to load survey for editing.")
+      return
+    }
+    if (qErr) {
+      console.error(qErr)
+      alert("Failed to load questions.")
+      return
+    }
+    const draftFromDb: SurveyDraft = {
+      id: newId(),
+      name: sData.name,
+      description: sData.description ?? "",
+      audience: sData.audience,
+      department: sData.department ?? "",
+      employees: (sData.employees ?? []) as string[],
+      dueDate: sData.due_date ?? "",
+      status: "draft",
+      questions: (qData || []).map((q: any) => ({
+        id: q.id,
+        type: q.question_type as QuestionType,
+        prompt: q.prompt,
+        options: q.options ?? undefined,
+      })),
+    }
+    setEditDraft(draftFromDb)
+    setOpenEdit(true)
+  }
+
+  async function saveEdit() {
+    if (!editSurveyId || !editDraft) return
+    setSavingEdit(true)
+    try {
+      // update surveys
+      const { error: upErr } = await supabase
+        .from("surveys")
+        .update({
+          name: editDraft.name,
+          description: editDraft.description,
+          due_date: editDraft.dueDate || null,
+          audience: editDraft.audience,
+          department: editDraft.audience === "department" ? (editDraft.department || null) : null,
+          employees: editDraft.audience === "individuals" ? (editDraft.employees ?? null) : null,
+        })
+        .eq("id", editSurveyId)
+      if (upErr) throw upErr
+
+      // replace questions (simple + reliable)
+      const { error: delErr } = await supabase.from("survey_questions").delete().eq("survey_id", editSurveyId)
+      if (delErr) throw delErr
+
+      if (editDraft.questions.length > 0) {
+        const inserts = editDraft.questions.map((q) => ({
+          survey_id: editSurveyId,
+          question_type: q.type,
+          prompt: q.prompt,
+          options: q.type === "multi_choice" ? (q.options ?? []) : null,
+        }))
+        const { error: insErr } = await supabase.from("survey_questions").insert(inserts)
+        if (insErr) throw insErr
+      }
+
+      setOpenEdit(false)
+      setEditSurveyId(null)
+      setEditDraft(null)
+      await fetchSurveys()
+    } catch (err: any) {
+      console.error(err)
+      alert(`Failed to save: ${err?.message || "unknown error"}`)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function deleteSurvey(sid: string) {
+    if (!confirm("Delete this survey? This also deletes its questions and answers.")) return
+    const { error } = await supabase.from("surveys").delete().eq("id", sid)
+    if (error) {
+      console.error(error)
+      alert(`Failed to delete: ${error.message}`)
+      return
+    }
+    setSurveys((prev) => prev.filter((s) => s.id !== sid))
+  }
+
+  /* ===================================================
+     Answers popup (left side)
+  =================================================== */
+
+  async function viewAnswers(resp: ResponseRow) {
+    setOpenAnswers(true)
+    setAnswersLoading(true)
+    setAnswersTitle(`${resp.firstName} ${resp.lastName} — ${resp.surveyName}`)
+
+    // Get answers joined with prompts
+    const { data, error } = await supabase
+      .from("survey_answers")
+      .select(`
+        answer_text,
+        answer_int,
+        answer_opts,
+        survey_questions!inner ( prompt )
+      `)
+      .eq("response_id", resp.id)
+
+    if (error) {
+      console.error(error)
+      setAnswers([])
+    } else {
+      const mapped = (data || []).map((r: any) => {
+        const value =
+          r.answer_text ??
+          (r.answer_int != null ? String(r.answer_int) : (r.answer_opts ? r.answer_opts.join(", ") : ""))
+        const prompt = r.survey_questions?.[0]?.prompt ?? r.survey_questions?.prompt ?? ""
+        return { prompt, value }
+      })
+      setAnswers(mapped)
+      // mark as viewed locally
+      setRows((prev) => prev.map((row) => (row.id === resp.id ? { ...row, viewed: true } : row)))
+    }
+
+    setAnswersLoading(false)
+  }
+
+  /* ===================================================
+     Filters / visible rows
+  =================================================== */
+
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((r) => {
+      const name = `${r.firstName} ${r.lastName}`.toLowerCase()
+      return name.includes(q) || r.surveyName.toLowerCase().includes(q)
+    })
+  }, [rows, search])
+
+  /* ===================================================
+     Render
+  =================================================== */
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* Header (search + filters + Create survey) */}
-      <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
-        {showCreatedBanner && (
-          <div className="mb-2 rounded-md border border-green-200 bg-green-50 text-green-800 px-3 py-2 text-sm">
-            <strong>{showCreatedBanner.name}</strong> has been published and saved to the database.
-          </div>
-        )}
+      {showCreatedBanner && (
+        <div className="m-4 rounded-md border border-green-200 bg-green-50 text-green-800 px-3 py-2 text-sm">
+          <strong>{showCreatedBanner.name}</strong> has been published and saved.
+        </div>
+      )}
 
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search by ID, Name, Email"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+      <div className="p-4 border-b border-gray-200 flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search employee or survey..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+          <DialogTrigger asChild>
+            <Button className="bg-green-600 hover:bg-green-700">
+              <Plus className="w-4 h-4 mr-2" />
+              Create survey
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Create a new survey</DialogTitle>
+              <DialogDescription>Define audience, due date, and add questions.</DialogDescription>
+            </DialogHeader>
+
+            <SurveyEditor
+              draft={draft}
+              setDraft={setDraft}
+              addQuestion={addQuestion}
+              removeQuestion={removeQuestion}
+              updateQuestion={updateQuestion}
+              setAudience={setAudience}
+              isEditing={false}
             />
-          </div>
 
-          {/* Filters */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                <Filter className="h-4 w-4" />
-                Filters
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel>Survey Name</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setSurveyFilter("")}>All</DropdownMenuItem>
-              {SURVEY_TYPES.map((t) => (
-                <DropdownMenuItem key={t} onClick={() => setSurveyFilter(t)}>
-                  {t}
-                </DropdownMenuItem>
-              ))}
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => { setDraft(blankDraft()); setOpenCreate(false) }}>
+                Cancel
+              </Button>
+              <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish} disabled={loadingCreate}>
+                {loadingCreate ? "Publishing..." : "Create & publish"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setStatusFilter("")}>All</DropdownMenuItem>
-              {STATUSES.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => setStatusFilter(s)}>
-                  {s}
-                </DropdownMenuItem>
-              ))}
-
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Review status</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setReviewFilter("")}>All</DropdownMenuItem>
-              {REVIEW_STATUSES.map((s) => (
-                <DropdownMenuItem key={s} onClick={() => setReviewFilter(s)}>
-                  {s}
-                </DropdownMenuItem>
-              ))}
-
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setSurveyFilter(""); setStatusFilter(""); setReviewFilter("") }}>
-                Clear filters
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Create survey */}
-          <div className="ml-auto">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create survey
-                </Button>
-              </DialogTrigger>
-
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Create a new survey</DialogTitle>
-                  <DialogDescription>Define audience, due date, and add questions.</DialogDescription>
-                </DialogHeader>
-
-                {/* Form */}
-                <div className="space-y-6">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="survey-name">Survey name</Label>
-                      <Input
-                        id="survey-name"
-                        placeholder="e.g., Team Satisfaction – Q3"
-                        value={draft.name}
-                        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="due">Due date</Label>
-                      <Input
-                        id="due"
-                        type="date"
-                        value={draft.dueDate}
-                        onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <Label htmlFor="desc">Description</Label>
-                      <Textarea
-                        id="desc"
-                        placeholder="Explain the goal and estimated time to complete..."
-                        value={draft.description}
-                        onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Audience */}
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-1">
-                      <Label>Audience</Label>
-                      <Select value={draft.audience} onValueChange={(v: any) => setAudience(v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All employees</SelectItem>
-                          <SelectItem value="department">Department</SelectItem>
-                          <SelectItem value="individuals">Specific employees</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {draft.audience === "department" && (
-                      <div className="sm:col-span-1">
-                        <Label>Department</Label>
-                        <Select
-                          value={draft.department || ""}
-                          onValueChange={(v) => setDraft({ ...draft, department: v })}
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+        {/* ---------------- LEFT: Employee responses ---------------- */}
+        <div className="p-4 border-r border-gray-200">
+          <div className="mb-3 font-semibold">Employee Activity</div>
+          {loadingRows ? (
+            <div className="p-6 text-center text-gray-500">Loading responses...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Survey</TableHead>
+                    <TableHead className="w-28">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.firstName} {row.lastName}</TableCell>
+                      <TableCell>{row.surveyName}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant={row.viewed ? "outline" : "default"}
+                          size="sm"
+                          onClick={() => viewAnswers(row)}
+                          className={row.viewed ? "" : "bg-blue-600 hover:bg-blue-700"}
                         >
-                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-                          <SelectContent>
-                            {DEPARTMENTS.map((d) => (
-                              <SelectItem key={d} value={d}>{d}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                          <Eye className="w-4 h-4 mr-2" />
+                          {row.viewed ? "Viewed" : "View"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {visibleRows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-gray-500 py-8">No results</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
 
-                    {draft.audience === "individuals" && (
-                      <div className="sm:col-span-2">
-                        <Label htmlFor="employees">Employees (IDs or emails, comma-separated)</Label>
-                        <Input
-                          id="employees"
-                          placeholder="e.g., 12345, 67890, alice@company.com"
-                          value={(draft.employees ?? []).join(", ")}
-                          onChange={(e) =>
-                            setDraft({ ...draft, employees: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Questions */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label>Questions</Label>
-                      <Button variant="outline" size="sm" onClick={addQuestion}>
-                        <Plus className="w-4 h-4 mr-1" /> Add question
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {draft.questions.map((q, idx) => (
-                        <div key={q.id} className="rounded-md border border-gray-200 p-3">
-                          <div className="flex items-center gap-3">
-                            <Select
-                              value={q.type}
-                              onValueChange={(v: any) => {
-                                const next: Partial<Question> = { type: v }
-                                if (v === "multi_choice" && !q.options) next.options = ["Option 1", "Option 2"]
-                                if (v !== "multi_choice") next.options = undefined
-                                updateQuestion(q.id, next)
-                              }}
-                            >
-                              <SelectTrigger className="w-44">
-                                <SelectValue placeholder="Type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="short_text">Short text</SelectItem>
-                                <SelectItem value="long_text">Long text</SelectItem>
-                                <SelectItem value="rating">Rating (1–5)</SelectItem>
-                                <SelectItem value="multi_choice">Multiple choice</SelectItem>
-                              </SelectContent>
-                            </Select>
-
-                            <Input
-                              className="flex-1"
-                              placeholder={`Question ${idx + 1} prompt`}
-                              value={q.prompt}
-                              onChange={(e) => updateQuestion(q.id, { prompt: e.target.value })}
-                            />
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeQuestion(q.id)}
-                              aria-label="Remove question"
-                            >
-                              <Trash2 className="w-4 h-4 text-gray-500" />
-                            </Button>
-                          </div>
-
-                          {q.type === "multi_choice" && (
-                            <div className="mt-3 space-y-2">
-                              {(q.options ?? []).map((opt, i) => (
-                                <div key={i} className="flex items-center gap-2">
-                                  <Input
-                                    value={opt}
-                                    onChange={(e) => {
-                                      const opts = [...(q.options ?? [])]
-                                      opts[i] = e.target.value
-                                      updateQuestion(q.id, { options: opts })
-                                    }}
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      const opts = (q.options ?? []).filter((_, j) => j !== i)
-                                      updateQuestion(q.id, { options: opts })
-                                    }}
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              ))}
-
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateQuestion(q.id, { options: [...(q.options ?? []), "New option"] })}
-                              >
-                                + Add option
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <DialogFooter className="mt-4">
-                  <Button variant="outline" onClick={saveDraft}>Save draft</Button>
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish} disabled={loading}>
-                    {loading ? "Publishing..." : "Create & publish"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+        {/* ---------------- RIGHT: Your surveys ---------------- */}
+        <div className="p-4">
+          <div className="mb-3 font-semibold">Your Surveys</div>
+          {loadingSurveys ? (
+            <div className="p-6 text-center text-gray-500">Loading surveys...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Survey</TableHead>
+                    <TableHead>Audience</TableHead>
+                    <TableHead>Due</TableHead>
+                    <TableHead className="w-40 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {surveys.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="capitalize">{s.audience}</TableCell>
+                      <TableCell>{s.due_date ?? "—"}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => openEditSurvey(s.id)}>
+                          <Pencil className="w-4 h-4 mr-1" /> Edit
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => deleteSurvey(s.id)}>
+                          <Trash2 className="w-4 h-4 mr-1" /> Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {surveys.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-gray-500 py-8">No surveys yet</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Survey</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Submission Date</TableHead>
-              <TableHead>Review Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleRows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.id}</TableCell>
-                <TableCell>{row.firstName} {row.lastName}</TableCell>
-                <TableCell>{row.survey}</TableCell>
-                <TableCell>{row.status}</TableCell>
-                <TableCell>{row.submissionDate}</TableCell>
-                <TableCell>{row.reviewStatus}</TableCell>
-              </TableRow>
-            ))}
-            {visibleRows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">No results</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Answers modal */}
+      <Dialog open={openAnswers} onOpenChange={setOpenAnswers}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{answersTitle}</DialogTitle>
+          </DialogHeader>
+          {answersLoading ? (
+            <div className="p-6 text-gray-500">Loading answers…</div>
+          ) : answers.length === 0 ? (
+            <div className="p-6 text-gray-500">No answers submitted.</div>
+          ) : (
+            <div className="space-y-4">
+              {answers.map((a, idx) => (
+                <div key={idx} className="rounded border p-3">
+                  <div className="text-sm text-gray-500 mb-1">{a.prompt}</div>
+                  <div className="font-medium break-words">{a.value || "—"}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setOpenAnswers(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit modal */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit survey</DialogTitle>
+          </DialogHeader>
+
+          {editDraft ? (
+            <>
+              <SurveyEditor
+                draft={editDraft}
+                setDraft={setEditDraft as any}
+                addQuestion={addQuestion}
+                removeQuestion={removeQuestion}
+                updateQuestion={updateQuestion}
+                setAudience={setAudience}
+                isEditing
+              />
+              <DialogFooter className="mt-4">
+                <Button variant="outline" onClick={() => setOpenEdit(false)}>Cancel</Button>
+                <Button onClick={saveEdit} disabled={savingEdit}>{savingEdit ? "Saving..." : "Save changes"}</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <div className="p-6 text-gray-500">Loading…</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
-/* ======================== Helpers ======================== */
-// Simple random ID generator
-function cryptoRandomId() {
-  return Math.random().toString(36).slice(2)
+/* ===================================================
+   Reusable Survey Editor (create & edit)
+=================================================== */
+
+function SurveyEditor(props: {
+  draft: SurveyDraft
+  setDraft: (fn: any) => void
+  addQuestion: (d: SurveyDraft, setD: (f: any) => void) => void
+  removeQuestion: (d: SurveyDraft, setD: (f: any) => void, qid: string) => void
+  updateQuestion: (d: SurveyDraft, setD: (f: any) => void, qid: string, next: Partial<Question>) => void
+  setAudience: (d: SurveyDraft, setD: (f: any) => void, a: SurveyDraft["audience"]) => void
+  isEditing?: boolean
+}) {
+  const { draft, setDraft, addQuestion, removeQuestion, updateQuestion, setAudience, isEditing } = props
+
+  return (
+    <div className="space-y-6">
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="survey-name">{isEditing ? "Survey name" : "Survey name"}</Label>
+          <Input
+            id="survey-name"
+            placeholder="e.g., Team Satisfaction – Q3"
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="due">Due date</Label>
+          <Input
+            id="due"
+            type="date"
+            value={draft.dueDate}
+            onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="desc">Description</Label>
+          <Textarea
+            id="desc"
+            placeholder="Explain the goal and estimated time to complete..."
+            value={draft.description}
+            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="sm:col-span-1">
+          <Label>Audience</Label>
+          <Select value={draft.audience} onValueChange={(v: any) => setAudience(draft, setDraft, v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All employees</SelectItem>
+              <SelectItem value="department">Department</SelectItem>
+              <SelectItem value="individuals">Specific employees</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {draft.audience === "department" && (
+          <div className="sm:col-span-1">
+            <Label>Department</Label>
+            <Select
+              value={draft.department || ""}
+              onValueChange={(v) => setDraft({ ...draft, department: v })}
+            >
+              <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {draft.audience === "individuals" && (
+          <div className="sm:col-span-2">
+            <Label htmlFor="employees">Employees (IDs or emails, comma-separated)</Label>
+            <Input
+              id="employees"
+              placeholder="e.g., 12345, 67890, alice@company.com"
+              value={(draft.employees ?? []).join(", ")}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  employees: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                })
+              }
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Questions */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Label>Questions</Label>
+          <Button variant="outline" size="sm" onClick={() => addQuestion(draft, setDraft)}>
+            <Plus className="w-4 h-4 mr-1" /> Add question
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          {draft.questions.map((q, idx) => (
+            <div key={q.id} className="rounded-md border border-gray-200 p-3">
+              <div className="flex items-center gap-3">
+                <Select
+                  value={q.type}
+                  onValueChange={(v: any) => {
+                    const next: Partial<Question> = { type: v }
+                    if (v === "multi_choice" && !q.options) next.options = ["Option 1", "Option 2"]
+                    if (v !== "multi_choice") next.options = undefined
+                    updateQuestion(draft, setDraft, q.id, next)
+                  }}
+                >
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="short_text">Short text</SelectItem>
+                    <SelectItem value="long_text">Long text</SelectItem>
+                    <SelectItem value="rating">Rating (1–5)</SelectItem>
+                    <SelectItem value="multi_choice">Multiple choice</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Input
+                  className="flex-1"
+                  placeholder={`Question ${idx + 1} prompt`}
+                  value={q.prompt}
+                  onChange={(e) => updateQuestion(draft, setDraft, q.id, { prompt: e.target.value })}
+                />
+
+                <Button variant="ghost" size="icon" onClick={() => removeQuestion(draft, setDraft, q.id)} aria-label="Remove question">
+                  <Trash2 className="w-4 h-4 text-gray-500" />
+                </Button>
+              </div>
+
+              {q.type === "multi_choice" && (
+                <div className="mt-3 space-y-2">
+                  {(q.options ?? []).map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        value={opt}
+                        onChange={(e) => {
+                          const opts = [...(q.options ?? [])]
+                          opts[i] = e.target.value
+                          updateQuestion(draft, setDraft, q.id, { options: opts })
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const opts = (q.options ?? []).filter((_, j) => j !== i)
+                          updateQuestion(draft, setDraft, q.id, { options: opts })
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateQuestion(draft, setDraft, q.id, { options: [...(q.options ?? []), "New option"] })}
+                  >
+                    + Add option
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
