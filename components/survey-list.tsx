@@ -167,4 +167,19 @@ export function SurveyList() {
     }))
   }
 
+
+  function saveDraft() {
+    const entry = { ...draft, status: "draft" as const }
+    setSurveysCatalog((prev) => {
+      const i = prev.findIndex((s) => s.id === entry.id)
+      if (i >= 0) {
+        const copy = [...prev]; copy[i] = entry; return copy
+      }
+      return [entry, ...prev]
+    })
+    setDraft(blankDraft())
+    setOpen(false)
+  }
+
+
 }
