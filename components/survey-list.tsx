@@ -34,3 +34,24 @@ type SurveyRow = {
   reviewStatus: "Reviewed" | "Pending" | "Pending Review"
   notes?: string
 }
+
+type QuestionType = "short_text" | "long_text" | "rating" | "multi_choice"
+
+type Question = {
+  id: string
+  type: QuestionType
+  prompt: string
+  options?: string[]
+}
+
+type SurveyDraft = {
+  id: string
+  name: string
+  description?: string
+  audience: "all" | "department" | "individuals"
+  department?: string
+  employees?: string[]
+  dueDate?: string
+  questions: Question[]
+  status: "draft" | "published"
+}
