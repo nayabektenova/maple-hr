@@ -73,5 +73,27 @@ export function SurveyList() {
 
   const [surveysCatalog, setSurveysCatalog] = useState<SurveyDraft[]>([])
   const [showCreatedBanner, setShowCreatedBanner] = useState<{ id: string; name: string } | null>(null)
+  
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<SurveyDraft>(() => blankDraft())
+  const [loading, setLoading] = useState(false)
+
+  function blankDraft(): SurveyDraft {
+    return {
+      id: cryptoRandomId(),
+      name: "",
+      description: "",
+      audience: "all",
+      department: "",
+      employees: [],
+      dueDate: "",
+      questions: [
+        { id: cryptoRandomId(), type: "short_text", prompt: "What’s going well?" },
+        { id: cryptoRandomId(), type: "long_text", prompt: "Any challenges you’d like to share?" },
+        { id: cryptoRandomId(), type: "rating", prompt: "Rate your overall satisfaction (1-5)" },
+      ],
+      status: "draft",
+    }
+  }
 
 }
