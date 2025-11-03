@@ -1,24 +1,28 @@
+// components/survey-list.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
 import { Search, Filter, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-  DialogFooter, DialogTrigger,
-} from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@supabase/supabase-js"
+
+/** Single, safe ID generator used everywhere in this file */
+const newId = () => {
+  try {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      // @ts-ignore - for older TS DOM libs
+      return crypto.randomUUID()
+    }
+  } catch {}
+  return Math.random().toString(36).slice(2)
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -61,7 +65,6 @@ const STATUSES: Array<SurveyRow["status"]> = ["Submitted", "Pending", "In progre
 const REVIEW_STATUSES: Array<SurveyRow["reviewStatus"]> = ["Reviewed", "Pending", "Pending Review"]
 const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
 
-
 export function SurveyList() {
   const [search, setSearch] = useState("")
   const [surveyFilter, setSurveyFilter] = useState<string | "">("")
@@ -73,14 +76,14 @@ export function SurveyList() {
 
   const [surveysCatalog, setSurveysCatalog] = useState<SurveyDraft[]>([])
   const [showCreatedBanner, setShowCreatedBanner] = useState<{ id: string; name: string } | null>(null)
-  
+
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<SurveyDraft>(() => blankDraft())
   const [loading, setLoading] = useState(false)
 
   function blankDraft(): SurveyDraft {
     return {
-      id: cryptoRandomId(),
+      id: newId(),
       name: "",
       description: "",
       audience: "all",
@@ -88,14 +91,13 @@ export function SurveyList() {
       employees: [],
       dueDate: "",
       questions: [
-        { id: cryptoRandomId(), type: "short_text", prompt: "What’s going well?" },
-        { id: cryptoRandomId(), type: "long_text", prompt: "Any challenges you’d like to share?" },
-        { id: cryptoRandomId(), type: "rating", prompt: "Rate your overall satisfaction (1-5)" },
+        { id: newId(), type: "short_text", prompt: "What’s going well?" },
+        { id: newId(), type: "long_text", prompt: "Any challenges you’d like to share?" },
+        { id: newId(), type: "rating", prompt: "Rate your overall satisfaction (1-5)" },
       ],
       status: "draft",
     }
   }
-
 
   useEffect(() => {
     fetchResponses()
@@ -126,7 +128,6 @@ export function SurveyList() {
     }
     setLoadingRows(false)
   }
-  
 
   const visibleRows = useMemo(() => {
     return rows.filter((r) => {
@@ -139,11 +140,10 @@ export function SurveyList() {
     })
   }, [rows, search, surveyFilter, statusFilter, reviewFilter])
 
-
   function addQuestion() {
     setDraft((d) => ({
       ...d,
-      questions: [...d.questions, { id: cryptoRandomId(), type: "short_text", prompt: "" }],
+      questions: [...d.questions, { id: newId(), type: "short_text", prompt: "" }],
     }))
   }
 
@@ -167,13 +167,14 @@ export function SurveyList() {
     }))
   }
 
-
   function saveDraft() {
     const entry = { ...draft, status: "draft" as const }
     setSurveysCatalog((prev) => {
       const i = prev.findIndex((s) => s.id === entry.id)
       if (i >= 0) {
-        const copy = [...prev]; copy[i] = entry; return copy
+        const copy = [...prev]
+        copy[i] = entry
+        return copy
       }
       return [entry, ...prev]
     })
@@ -181,65 +182,73 @@ export function SurveyList() {
     setOpen(false)
   }
 
-
-
   async function createAndPublish() {
     setLoading(true)
     try {
+      // 1) create the survey
       const { data: surveyData, error: surveyError } = await supabase
-        .from("survey")
-        .insert([{
-          survey_name: draft.name,
-          description: draft.description,
-          due_date: draft.dueDate || null,
-          audience: draft.audience,
-          department: draft.audience === "department" ? (draft.department || null) : null,
-          employees: draft.audience === "individuals" ? (draft.employees ?? null) : null,
-        }])
-        .select("survey_id")
+        .from("surveys") // <-- plural
+        .insert([
+          {
+            name: draft.name,               // <-- column renamed
+            description: draft.description,
+            due_date: draft.dueDate || null,
+            audience: draft.audience,
+            department: draft.audience === "department" ? (draft.department || null) : null,
+            employees: draft.audience === "individuals" ? (draft.employees ?? null) : null,
+            status: "published",
+          },
+        ])
+        .select("id") // <-- UUID PK
         .single()
-      if (surveyError) throw surveyError
-      const surveyId = surveyData.survey_id
 
+      if (surveyError) throw surveyError
+      const surveyId: string = surveyData.id
+
+      // 2) insert questions (if any)
       if (draft.questions.length > 0) {
         const questionInserts = draft.questions.map((q) => ({
           survey_id: surveyId,
           question_type: q.type,
-          question_title: q.prompt,
+          prompt: q.prompt, // <-- column renamed (was question_title)
           options: q.type === "multi_choice" ? (q.options ?? []) : null,
         }))
-        const { error: questionsError } = await supabase.from("questions").insert(questionInserts)
+
+        const { error: questionsError } = await supabase
+          .from("survey_questions") // <-- new table name
+          .insert(questionInserts)
+
         if (questionsError) throw questionsError
       }
 
+      // 3) update local catalog and UI
       const entry = { ...draft, status: "published" as const }
       setSurveysCatalog((prev) => {
         const i = prev.findIndex((s) => s.id === entry.id)
-        const next = i >= 0 ? prev.map((s) => (s.id === entry.id ? entry : s)) : [entry, ...prev]
-        return next
+        return i >= 0 ? prev.map((s) => (s.id === entry.id ? entry : s)) : [entry, ...prev]
       })
+
       setShowCreatedBanner({ id: entry.id, name: entry.name || "Untitled survey" })
       setDraft(blankDraft())
       setOpen(false)
       setTimeout(() => setShowCreatedBanner(null), 4000)
 
+      // if your table of responses depends on DB state, refresh it
       await fetchResponses()
-    } catch (err) {
-      console.error("Error publishing survey:", err)
-      alert("Failed to publish survey. Check console for details.")
+    } catch (err: any) {
+      console.error("Error publishing survey:", err?.message || err)
+      alert(`Failed to publish survey: ${err?.message || "unknown error"}`)
     } finally {
       setLoading(false)
     }
   }
 
 
-
-
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-6 py-4 border-b border-gray-200 flex flex-col gap-2">
         {showCreatedBanner && (
-          <div className="mb-2 rounded-md border border-green-200 bg-green-50 text-green-800 px-3 py-2 text-sm">
+          <div className="mb-2 rounded-md border border-green-2 00 bg-green-50 text-green-800 px-3 py-2 text-sm">
             <strong>{showCreatedBanner.name}</strong> has been published and saved to the database.
           </div>
         )}
@@ -290,7 +299,13 @@ export function SurveyList() {
               ))}
 
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setSurveyFilter(""); setStatusFilter(""); setReviewFilter("") }}>
+              <DropdownMenuItem
+                onClick={() => {
+                  setSurveyFilter("")
+                  setStatusFilter("")
+                  setReviewFilter("")
+                }}
+              >
                 Clear filters
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -304,7 +319,6 @@ export function SurveyList() {
                   Create survey
                 </Button>
               </DialogTrigger>
-
 
               <DialogContent className="max-w-3xl">
                 <DialogHeader>
@@ -347,7 +361,9 @@ export function SurveyList() {
                     <div className="sm:col-span-1">
                       <Label>Audience</Label>
                       <Select value={draft.audience} onValueChange={(v: any) => setAudience(v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All employees</SelectItem>
                           <SelectItem value="department">Department</SelectItem>
@@ -363,10 +379,14 @@ export function SurveyList() {
                           value={draft.department || ""}
                           onValueChange={(v) => setDraft({ ...draft, department: v })}
                         >
-                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
                           <SelectContent>
                             {DEPARTMENTS.map((d) => (
-                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                              <SelectItem key={d} value={d}>
+                                {d}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -383,7 +403,10 @@ export function SurveyList() {
                           onChange={(e) =>
                             setDraft({
                               ...draft,
-                              employees: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                              employees: e.target.value
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean),
                             })
                           }
                         />
@@ -391,7 +414,7 @@ export function SurveyList() {
                     )}
                   </div>
 
-                    {/* Questions */}
+                  {/* Questions */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <Label>Questions</Label>
@@ -431,7 +454,12 @@ export function SurveyList() {
                               onChange={(e) => updateQuestion(q.id, { prompt: e.target.value })}
                             />
 
-                            <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} aria-label="Remove question">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeQuestion(q.id)}
+                              aria-label="Remove question"
+                            >
                               <Trash2 className="w-4 h-4 text-gray-500" />
                             </Button>
                           </div>
@@ -464,7 +492,9 @@ export function SurveyList() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => updateQuestion(q.id, { options: [...(q.options ?? []), "New option"] })}
+                                onClick={() =>
+                                  updateQuestion(q.id, { options: [...(q.options ?? []), "New option"] })
+                                }
                               >
                                 + Add option
                               </Button>
@@ -476,24 +506,19 @@ export function SurveyList() {
                   </div>
 
                   <DialogFooter className="mt-4">
-                    <Button variant="outline" onClick={saveDraft}>Save draft</Button>
+                    <Button variant="outline" onClick={saveDraft}>
+                      Save draft
+                    </Button>
                     <Button className="bg-green-600 hover:bg-green-700" onClick={createAndPublish} disabled={loading}>
                       {loading ? "Publishing..." : "Create & publish"}
                     </Button>
                   </DialogFooter>
-
-
-
                 </div>
               </DialogContent>
-
-
-                            
             </Dialog>
           </div>
         </div>
       </div>
-
 
       {loadingRows ? (
         <div className="p-6 text-center text-gray-500">Loading responses...</div>
@@ -514,7 +539,9 @@ export function SurveyList() {
               {visibleRows.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="font-mono text-xs">{row.id}</TableCell>
-                  <TableCell>{row.firstName} {row.lastName}</TableCell>
+                  <TableCell>
+                    {row.firstName} {row.lastName}
+                  </TableCell>
                   <TableCell>{row.survey}</TableCell>
                   <TableCell>{row.status}</TableCell>
                   <TableCell>{row.submissionDate}</TableCell>
@@ -523,23 +550,15 @@ export function SurveyList() {
               ))}
               {visibleRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">No results</TableCell>
+                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    No results
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       )}
-
     </div>
   )
-
-
-
-
 }
-
-function cryptoRandomId() {
-  return Math.random().toString(36).slice(2)
-}
-
