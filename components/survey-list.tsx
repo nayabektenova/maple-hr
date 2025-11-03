@@ -55,3 +55,8 @@ type SurveyDraft = {
   questions: Question[]
   status: "draft" | "published"
 }
+
+const SURVEY_TYPES: Array<string> = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
+const STATUSES: Array<SurveyRow["status"]> = ["Submitted", "Pending", "In progress"]
+const REVIEW_STATUSES: Array<SurveyRow["reviewStatus"]> = ["Reviewed", "Pending", "Pending Review"]
+const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
