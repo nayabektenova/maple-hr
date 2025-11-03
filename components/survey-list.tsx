@@ -493,6 +493,44 @@ export function SurveyList() {
           </div>
         </div>
       </div>
+
+
+      {loadingRows ? (
+        <div className="p-6 text-center text-gray-500">Loading responses...</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Survey</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Submission Date</TableHead>
+                <TableHead>Review Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleRows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-mono text-xs">{row.id}</TableCell>
+                  <TableCell>{row.firstName} {row.lastName}</TableCell>
+                  <TableCell>{row.survey}</TableCell>
+                  <TableCell>{row.status}</TableCell>
+                  <TableCell>{row.submissionDate}</TableCell>
+                  <TableCell>{row.reviewStatus}</TableCell>
+                </TableRow>
+              ))}
+              {visibleRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">No results</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
     </div>
   )
 
