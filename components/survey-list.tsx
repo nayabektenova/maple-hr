@@ -305,7 +305,96 @@ export function SurveyList() {
                 </Button>
               </DialogTrigger>
 
-              
+
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Create a new survey</DialogTitle>
+                  <DialogDescription>Define audience, due date, and add questions.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="survey-name">Survey name</Label>
+                      <Input
+                        id="survey-name"
+                        placeholder="e.g., Team Satisfaction – Q3"
+                        value={draft.name}
+                        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="due">Due date</Label>
+                      <Input
+                        id="due"
+                        type="date"
+                        value={draft.dueDate}
+                        onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="desc">Description</Label>
+                      <Textarea
+                        id="desc"
+                        placeholder="Explain the goal and estimated time to complete..."
+                        value={draft.description}
+                        onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-1">
+                      <Label>Audience</Label>
+                      <Select value={draft.audience} onValueChange={(v: any) => setAudience(v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All employees</SelectItem>
+                          <SelectItem value="department">Department</SelectItem>
+                          <SelectItem value="individuals">Specific employees</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {draft.audience === "department" && (
+                      <div className="sm:col-span-1">
+                        <Label>Department</Label>
+                        <Select
+                          value={draft.department || ""}
+                          onValueChange={(v) => setDraft({ ...draft, department: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                          <SelectContent>
+                            {DEPARTMENTS.map((d) => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {draft.audience === "individuals" && (
+                      <div className="sm:col-span-2">
+                        <Label htmlFor="employees">Employees (IDs or emails, comma-separated)</Label>
+                        <Input
+                          id="employees"
+                          placeholder="e.g., 12345, 67890, alice@company.com"
+                          value={(draft.employees ?? []).join(", ")}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              employees: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </DialogContent>
+
+
+                            
             </Dialog>
           </div>
         </div>
