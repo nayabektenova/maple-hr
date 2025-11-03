@@ -126,5 +126,17 @@ export function SurveyList() {
     }
     setLoadingRows(false)
   }
+  
+
+  const visibleRows = useMemo(() => {
+    return rows.filter((r) => {
+      const q = `${r.firstName} ${r.lastName}`.toLowerCase()
+      const matchesQuery = q.includes(search.toLowerCase()) || r.id.includes(search)
+      const matchesSurvey = surveyFilter ? r.survey === surveyFilter : true
+      const matchesStatus = statusFilter ? r.status === statusFilter : true
+      const matchesReview = reviewFilter ? r.reviewStatus === reviewFilter : true
+      return matchesQuery && matchesSurvey && matchesStatus && matchesReview
+    })
+  }, [rows, search, surveyFilter, statusFilter, reviewFilter])
 
 }
