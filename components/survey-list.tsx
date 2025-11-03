@@ -182,4 +182,56 @@ export function SurveyList() {
   }
 
 
+
+  async function createAndPublish() {
+    setLoading(true)
+    try {
+      const { data: surveyData, error: surveyError } = await supabase
+        .from("survey")
+        .insert([{
+          survey_name: draft.name,
+          description: draft.description,
+          due_date: draft.dueDate || null,
+          audience: draft.audience,
+          department: draft.audience === "department" ? (draft.department || null) : null,
+          employees: draft.audience === "individuals" ? (draft.employees ?? null) : null,
+        }])
+        .select("survey_id")
+        .single()
+      if (surveyError) throw surveyError
+      const surveyId = surveyData.survey_id
+
+      if (draft.questions.length > 0) {
+        const questionInserts = draft.questions.map((q) => ({
+          survey_id: surveyId,
+          question_type: q.type,
+          question_title: q.prompt,
+          options: q.type === "multi_choice" ? (q.options ?? []) : null,
+        }))
+        const { error: questionsError } = await supabase.from("questions").insert(questionInserts)
+        if (questionsError) throw questionsError
+      }
+
+      const entry = { ...draft, status: "published" as const }
+      setSurveysCatalog((prev) => {
+        const i = prev.findIndex((s) => s.id === entry.id)
+        const next = i >= 0 ? prev.map((s) => (s.id === entry.id ? entry : s)) : [entry, ...prev]
+        return next
+      })
+      setShowCreatedBanner({ id: entry.id, name: entry.name || "Untitled survey" })
+      setDraft(blankDraft())
+      setOpen(false)
+      setTimeout(() => setShowCreatedBanner(null), 4000)
+
+      await fetchResponses()
+    } catch (err) {
+      console.error("Error publishing survey:", err)
+      alert("Failed to publish survey. Check console for details.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+
 }
