@@ -273,10 +273,17 @@ export default function SurveyEmployee() {
 
       {/* Answer modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        {/* Key: cap overall height and make the middle content scroll */}
-        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] p-0 overflow-hidden">
-          {/* Sticky header */}
-          <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur px-5 py-4">
+        {/* 3-row grid ensures the middle row has a fixed space that can scroll */}
+        <DialogContent
+          className="
+            w-[95vw] sm:max-w-3xl
+            max-h-[90vh] p-0
+            grid grid-rows-[auto,1fr,auto]
+            overflow-hidden
+          "
+        >
+          {/* Header */}
+          <div className="border-b border-gray-200 bg-white px-5 py-4">
             <DialogHeader className="p-0">
               <DialogTitle>
                 {activeSurvey ? `Answer: ${activeSurvey.name}` : "Answer survey"}
@@ -287,136 +294,140 @@ export default function SurveyEmployee() {
             </DialogHeader>
           </div>
 
+          {/* Scrollable body */}
           {!activeSurvey ? (
-            <div className="p-6 text-gray-500">Loading…</div>
+            <div className="px-5 py-6 text-gray-500 overflow-y-auto">Loading…</div>
           ) : (
-            <div className="flex flex-col h-full">
-              {/* Scrollable body */}
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-                {/* Respondent details */}
-                <div className="grid sm:grid-cols-2 gap-3 rounded-md border border-gray-200 p-3">
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="employee-id">Employee ID</Label>
-                    <Input
-                      id="employee-id"
-                      placeholder="Enter your ID (email or number)"
-                      value={employeeId}
-                      onChange={(e) => setEmployeeId(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="first-name">First name</Label>
-                    <Input
-                      id="first-name"
-                      placeholder="Your first name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="last-name">Last name</Label>
-                    <Input
-                      id="last-name"
-                      placeholder="Your last name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label>Survey</Label>
-                    <Input value={activeSurvey.name} disabled />
-                  </div>
+            <div
+              className="
+                overflow-y-auto
+                px-5 py-4 space-y-6
+                max-h-[calc(90vh-56px-56px)]
+              "
+            >
+              {/* Respondent details */}
+              <div className="grid sm:grid-cols-2 gap-3 rounded-md border border-gray-200 p-3">
+                <div className="sm:col-span-2">
+                  <Label htmlFor="employee-id">Employee ID</Label>
+                  <Input
+                    id="employee-id"
+                    placeholder="Enter your ID (email or number)"
+                    value={employeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                  />
                 </div>
-
-                {/* All questions (no pagination, the area scrolls) */}
-                <div className="space-y-4">
-                  {activeSurvey.survey_questions.map((q, idx) => (
-                    <div key={q.id} className="rounded-md border border-gray-200 p-3">
-                      <Label className="block mb-2">
-                        {idx + 1}. {q.prompt}
-                      </Label>
-
-                      {q.question_type === "short_text" && (
-                        <Input
-                          value={(answers[q.id] as string) ?? ""}
-                          onChange={(e) => updateAnswer(q.id, e.target.value)}
-                          placeholder="Your answer"
-                        />
-                      )}
-
-                      {q.question_type === "long_text" && (
-                        <Textarea
-                          value={(answers[q.id] as string) ?? ""}
-                          onChange={(e) => updateAnswer(q.id, e.target.value)}
-                          placeholder="Type your response…"
-                          className="min-h-[120px] max-h-[240px] overflow-y-auto"
-                        />
-                      )}
-
-                      {q.question_type === "rating" && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <Button
-                              key={n}
-                              type="button"
-                              variant={(answers[q.id] as number) === n ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => updateAnswer(q.id, n)}
-                              className={(answers[q.id] as number) === n ? "bg-blue-600 hover:bg-blue-700" : ""}
-                            >
-                              {n}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-
-                      {q.question_type === "multi_choice" && (
-                        <div className="flex flex-wrap gap-2">
-                          {(q.options ?? []).map((opt) => {
-                            const arr = (answers[q.id] as string[]) ?? []
-                            const checked = arr.includes(opt)
-                            return (
-                              <Button
-                                key={opt}
-                                type="button"
-                                variant={checked ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => {
-                                  const next = new Set(arr)
-                                  if (checked) next.delete(opt)
-                                  else next.add(opt)
-                                  updateAnswer(q.id, Array.from(next))
-                                }}
-                                className={checked ? "bg-blue-600 hover:bg-blue-700" : ""}
-                              >
-                                {opt}
-                              </Button>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div>
+                  <Label htmlFor="first-name">First name</Label>
+                  <Input
+                    id="first-name"
+                    placeholder="Your first name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="last-name">Last name</Label>
+                  <Input
+                    id="last-name"
+                    placeholder="Your last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label>Survey</Label>
+                  <Input value={activeSurvey.name} disabled />
                 </div>
               </div>
 
-              {/* Sticky footer */}
-              <div className="sticky bottom-0 z-10 border-t border-gray-200 bg-white/90 backdrop-blur px-5 py-3">
-                <DialogFooter className="flex w-full items-center justify-end gap-2 p-0">
-                  <Button variant="outline" onClick={() => setOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={submitAnswers}
-                    disabled={submitting}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {submitting ? "Submitting…" : "Submit"}
-                  </Button>
-                </DialogFooter>
+              {/* All questions (no pagination; the body scrolls) */}
+              <div className="space-y-4">
+                {activeSurvey.survey_questions.map((q, idx) => (
+                  <div key={q.id} className="rounded-md border border-gray-200 p-3">
+                    <Label className="block mb-2">
+                      {idx + 1}. {q.prompt}
+                    </Label>
+
+                    {q.question_type === "short_text" && (
+                      <Input
+                        value={(answers[q.id] as string) ?? ""}
+                        onChange={(e) => updateAnswer(q.id, e.target.value)}
+                        placeholder="Your answer"
+                      />
+                    )}
+
+                    {q.question_type === "long_text" && (
+                      <Textarea
+                        value={(answers[q.id] as string) ?? ""}
+                        onChange={(e) => updateAnswer(q.id, e.target.value)}
+                        placeholder="Type your response…"
+                        className="min-h-[120px] max-h-[240px] overflow-y-auto"
+                      />
+                    )}
+
+                    {q.question_type === "rating" && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Button
+                            key={n}
+                            type="button"
+                            variant={(answers[q.id] as number) === n ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => updateAnswer(q.id, n)}
+                            className={(answers[q.id] as number) === n ? "bg-blue-600 hover:bg-blue-700" : ""}
+                          >
+                            {n}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.question_type === "multi_choice" && (
+                      <div className="flex flex-wrap gap-2">
+                        {(q.options ?? []).map((opt) => {
+                          const arr = (answers[q.id] as string[]) ?? []
+                          const checked = arr.includes(opt)
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={checked ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                const next = new Set(arr)
+                                if (checked) next.delete(opt)
+                                else next.add(opt)
+                                updateAnswer(q.id, Array.from(next))
+                              }}
+                              className={checked ? "bg-blue-600 hover:bg-blue-700" : ""}
+                            >
+                              {opt}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
+
+          {/* Footer */}
+          <div className="border-t border-gray-200 bg-white px-5 py-3">
+            <DialogFooter className="flex w-full items-center justify-end gap-2 p-0">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={submitAnswers}
+                disabled={submitting}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {submitting ? "Submitting…" : "Submit"}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
