@@ -16,13 +16,11 @@ import {
 import { Edit3, Search } from "lucide-react"
 
 /* -------------------- Supabase -------------------- */
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 /* -------------------- Types -------------------- */
-
 type QuestionType = "short_text" | "long_text" | "rating" | "multi_choice"
 
 type SurveyQ = {
@@ -43,7 +41,6 @@ type Survey = {
 /* =========================================================
    Employee Survey Component (no auth; user enters fields)
 ========================================================= */
-
 export default function SurveyEmployee() {
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
@@ -149,7 +146,7 @@ export default function SurveyEmployee() {
         return
       }
 
-      // Create response (include required legacy columns)
+      // Create response
       const { data: respIns, error: respErr } = await supabase
         .from("survey_responses")
         .insert([{
@@ -200,7 +197,7 @@ export default function SurveyEmployee() {
       const { error: ansErr } = await supabase.from("survey_answers").insert(inserts)
       if (ansErr) throw ansErr
 
-      // Optional: bump status to Submitted (kept for your existing trigger)
+      // Optional: bump status to Submitted
       const { error: updErr } = await supabase
         .from("survey_responses")
         .update({ status: "Submitted" })
@@ -276,134 +273,148 @@ export default function SurveyEmployee() {
 
       {/* Answer modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {activeSurvey ? `Answer: ${activeSurvey.name}` : "Answer survey"}
-            </DialogTitle>
-          </DialogHeader>
+        {/* Key: cap overall height and make the middle content scroll */}
+        <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[85vh] p-0 overflow-hidden">
+          {/* Sticky header */}
+          <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur px-5 py-4">
+            <DialogHeader className="p-0">
+              <DialogTitle>
+                {activeSurvey ? `Answer: ${activeSurvey.name}` : "Answer survey"}
+              </DialogTitle>
+              {activeSurvey?.description && (
+                <p className="mt-1 text-sm text-gray-600">{activeSurvey.description}</p>
+              )}
+            </DialogHeader>
+          </div>
 
           {!activeSurvey ? (
             <div className="p-6 text-gray-500">Loading…</div>
           ) : (
-            <div className="space-y-6">
-              {activeSurvey.description && (
-                <div className="text-sm text-gray-600">{activeSurvey.description}</div>
-              )}
-
-              {/* Respondent details (required) */}
-              <div className="grid sm:grid-cols-2 gap-3 rounded-md border border-gray-200 p-3">
-                <div className="sm:col-span-2">
-                  <Label htmlFor="employee-id">Employee ID</Label>
-                  <Input
-                    id="employee-id"
-                    placeholder="Enter your ID (email or number)"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="first-name">First name</Label>
-                  <Input
-                    id="first-name"
-                    placeholder="Your first name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="last-name">Last name</Label>
-                  <Input
-                    id="last-name"
-                    placeholder="Your last name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label>Survey</Label>
-                  <Input value={activeSurvey.name} disabled />
-                </div>
-              </div>
-
-              {/* Dynamic questions */}
-              <div className="space-y-4">
-                {activeSurvey.survey_questions.map((q, idx) => (
-                  <div key={q.id} className="rounded-md border border-gray-200 p-3">
-                    <Label className="block mb-2">
-                      {idx + 1}. {q.prompt}
-                    </Label>
-
-                    {q.question_type === "short_text" && (
-                      <Input
-                        value={(answers[q.id] as string) ?? ""}
-                        onChange={(e) => updateAnswer(q.id, e.target.value)}
-                        placeholder="Your answer"
-                      />
-                    )}
-
-                    {q.question_type === "long_text" && (
-                      <Textarea
-                        value={(answers[q.id] as string) ?? ""}
-                        onChange={(e) => updateAnswer(q.id, e.target.value)}
-                        placeholder="Type your response…"
-                      />
-                    )}
-
-                    {q.question_type === "rating" && (
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <Button
-                            key={n}
-                            type="button"
-                            variant={(answers[q.id] as number) === n ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => updateAnswer(q.id, n)}
-                            className={(answers[q.id] as number) === n ? "bg-blue-600 hover:bg-blue-700" : ""}
-                          >
-                            {n}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
-                    {q.question_type === "multi_choice" && (
-                      <div className="flex flex-wrap gap-2">
-                        {(q.options ?? []).map((opt) => {
-                          const arr = (answers[q.id] as string[]) ?? []
-                          const checked = arr.includes(opt)
-                          return (
-                            <Button
-                              key={opt}
-                              type="button"
-                              variant={checked ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                const next = new Set(arr)
-                                if (checked) next.delete(opt)
-                                else next.add(opt)
-                                updateAnswer(q.id, Array.from(next))
-                              }}
-                              className={checked ? "bg-blue-600 hover:bg-blue-700" : ""}
-                            >
-                              {opt}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                    )}
+            <div className="flex flex-col h-full">
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+                {/* Respondent details */}
+                <div className="grid sm:grid-cols-2 gap-3 rounded-md border border-gray-200 p-3">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="employee-id">Employee ID</Label>
+                    <Input
+                      id="employee-id"
+                      placeholder="Enter your ID (email or number)"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                    />
                   </div>
-                ))}
+                  <div>
+                    <Label htmlFor="first-name">First name</Label>
+                    <Input
+                      id="first-name"
+                      placeholder="Your first name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="last-name">Last name</Label>
+                    <Input
+                      id="last-name"
+                      placeholder="Your last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Survey</Label>
+                    <Input value={activeSurvey.name} disabled />
+                  </div>
+                </div>
+
+                {/* All questions (no pagination, the area scrolls) */}
+                <div className="space-y-4">
+                  {activeSurvey.survey_questions.map((q, idx) => (
+                    <div key={q.id} className="rounded-md border border-gray-200 p-3">
+                      <Label className="block mb-2">
+                        {idx + 1}. {q.prompt}
+                      </Label>
+
+                      {q.question_type === "short_text" && (
+                        <Input
+                          value={(answers[q.id] as string) ?? ""}
+                          onChange={(e) => updateAnswer(q.id, e.target.value)}
+                          placeholder="Your answer"
+                        />
+                      )}
+
+                      {q.question_type === "long_text" && (
+                        <Textarea
+                          value={(answers[q.id] as string) ?? ""}
+                          onChange={(e) => updateAnswer(q.id, e.target.value)}
+                          placeholder="Type your response…"
+                          className="min-h-[120px] max-h-[240px] overflow-y-auto"
+                        />
+                      )}
+
+                      {q.question_type === "rating" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <Button
+                              key={n}
+                              type="button"
+                              variant={(answers[q.id] as number) === n ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => updateAnswer(q.id, n)}
+                              className={(answers[q.id] as number) === n ? "bg-blue-600 hover:bg-blue-700" : ""}
+                            >
+                              {n}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+
+                      {q.question_type === "multi_choice" && (
+                        <div className="flex flex-wrap gap-2">
+                          {(q.options ?? []).map((opt) => {
+                            const arr = (answers[q.id] as string[]) ?? []
+                            const checked = arr.includes(opt)
+                            return (
+                              <Button
+                                key={opt}
+                                type="button"
+                                variant={checked ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => {
+                                  const next = new Set(arr)
+                                  if (checked) next.delete(opt)
+                                  else next.add(opt)
+                                  updateAnswer(q.id, Array.from(next))
+                                }}
+                                className={checked ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              >
+                                {opt}
+                              </Button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <DialogFooter className="mt-2">
-                <Button variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={submitAnswers} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
-                  {submitting ? "Submitting…" : "Submit"}
-                </Button>
-              </DialogFooter>
+              {/* Sticky footer */}
+              <div className="sticky bottom-0 z-10 border-t border-gray-200 bg-white/90 backdrop-blur px-5 py-3">
+                <DialogFooter className="flex w-full items-center justify-end gap-2 p-0">
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={submitAnswers}
+                    disabled={submitting}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {submitting ? "Submitting…" : "Submit"}
+                  </Button>
+                </DialogFooter>
+              </div>
             </div>
           )}
         </DialogContent>
