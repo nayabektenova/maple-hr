@@ -192,6 +192,9 @@ function CreateAnnouncementModal({
     //   payload.created_by = userData.user.id;
     // }
 
+    // the created_by will be set on server based on auth user or use client: attempt to get user
+    // Removed the created_by assignment to avoid issues
+
     console.log("Inserting payload:", payload);
 
     const { data, error } = await supabase
