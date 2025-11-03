@@ -538,3 +538,8 @@ export function SurveyList() {
 
 
 }
+
+function cryptoRandomId() {
+  return Math.random().toString(36).slice(2)
+}
+
