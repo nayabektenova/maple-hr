@@ -472,6 +472,10 @@ export function AnnouncementList() {
     [employees]
   );
 
+
+  // initial load
+  // this loads both employees (for depts) and announcements
+  // this is the fetch that gets announcements from supabase
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -532,6 +536,8 @@ export function AnnouncementList() {
   }, []);
 
   // filtered list
+  // this filters the announcements based on the search and filters
+  // it is memoized for performance
   const filtered = useMemo(() => {
     let rows = announcements.slice();
     if (searchTerm.trim()) {
@@ -566,6 +572,7 @@ export function AnnouncementList() {
   }
 
   // called when a new announcement is created by modal
+  // adds to top of list
   function handleCreated(created: Announcement) {
     // add to top of list
     setAnnouncements((prev) => [created, ...prev]);
