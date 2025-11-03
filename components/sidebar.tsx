@@ -38,7 +38,7 @@ const navigation = [
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
-
+  { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
 ]
 
 export function Sidebar() {
