@@ -68,7 +68,7 @@ export function Sidebar() {
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 h-18 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="MapleHR logo" className="w-8 h-8 object-contain" />
           <span className="text-xl font-semibold text-gray-900">MapleHR</span>
