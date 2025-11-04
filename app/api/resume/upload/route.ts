@@ -2,9 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+// These two lines are BOTH valid and can coexist:
 export const runtime = "nodejs"; // pdf-parse & mammoth need Node runtime
+export const dynamic = "force-dynamic"; // don't cache this route
 
-// Helpful message for accidental GETs (e.g., opening the URL directly)
+// Helpful message for accidental GETs (e.g. opening the URL directly)
 export async function GET() {
   return NextResponse.json(
     { error: "Use POST with multipart/form-data (file, jobId, applicantId)" },
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    // 5) Update applicant record
+    // 5) Update applicant record with extracted text + storage path
     const { error: dbError } = await supabase
       .from("resumeai_applicants")
       .update({
