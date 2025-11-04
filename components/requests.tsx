@@ -198,44 +198,7 @@ export default function Requests() {
     }
   };
 
-  async function seedDemoIntoDB() {
-    const demoRows = [
-      {
-        type: "Leave" as HrType,
-        employee_id: "000915041",
-        employee_name: "Abel Fekadu",
-        submitted_at: new Date(Date.now() - 3 * 864e5).toISOString(),
-        date_start: "2025-09-20",
-        date_end: "2025-09-25",
-        notes: "Family trip – PTO",
-        status: "pending" as RequestStatus,
-        is_demo: true,
-      },
-      {
-        type: "Shift Change" as HrType,
-        employee_id: "000394998",
-        employee_name: "Hunter Tapping",
-        submitted_at: new Date(Date.now() - 20 * 36e5).toISOString(),
-        date_start: "2025-09-22",
-        date_end: "2025-09-22",
-        notes: "Swap evening shift with Naya",
-        status: "pending" as RequestStatus,
-        is_demo: true,
-      },
-      {
-        type: "Expense" as HrType,
-        employee_id: "000957380",
-        employee_name: "Naya Bektenova",
-        submitted_at: new Date(Date.now() - 6 * 36e5).toISOString(),
-        amount: 124.56,
-        notes: "Conference taxi receipts",
-        status: "pending" as RequestStatus,
-        is_demo: true,
-      },
-    ];
-    const { error } = await supabase.from("hr_requests").insert(demoRows);
-    if (error) throw error;
-  }
+  
 
   const reset = async () => {
     setLoading(true);
@@ -339,10 +302,7 @@ export default function Requests() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Reset demo data button */}
-        <Button variant="outline" size="sm" onClick={reset}>
-          <RotateCcw className="mr-2 h-4 w-4" /> Reset demo data
-        </Button>
+        
       </div>
     </div>
 
