@@ -57,6 +57,8 @@ const navigation = [
   //{ name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   //{ name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
+  { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
+  { name: "HR Benefits", href: "/admin/benefits", icon: Sparkles },
   //{ name: "PayStub", href: "/paystub", icon: DollarSign },
   //{ name: "Leaves", href: "/leaves", icon: Plane },
 
