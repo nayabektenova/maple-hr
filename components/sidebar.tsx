@@ -71,7 +71,9 @@ export function Sidebar() {
       <div className="p-6 h-18 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="MapleHR logo" className="w-8 h-8 object-contain" />
-          <span className="text-xl font-semibold text-gray-900">MapleHR</span>
+          <div className="text-lg font-semibold text-gray-900 tracking-tight">
+            Maple<span style={{ color: "#2EB36D" }}>HR</span>
+          </div>
         </div>
       </div>
 
@@ -87,7 +89,7 @@ export function Sidebar() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative",
-                    isActive ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                    isActive ? "bg-green-50 text-green-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                   )}
                 >
                   <item.icon className="w-5 h-5" />
