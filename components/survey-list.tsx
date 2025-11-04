@@ -1,15 +1,13 @@
 // components/survey-list.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@supabase/supabase-js"
-import { Search, Filter, Plus, Trash2, Pencil, Eye } from "lucide-react"
+import { Search, Plus, Trash2, Pencil, Eye } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger
@@ -81,7 +79,6 @@ type SurveyRow = {
 
 /* -------------------- constants -------------------- */
 
-const SURVEY_TYPES = ["Team Satisfaction", "Manager feedback", "Improvement Suggestions"]
 const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
 
 /* ===================================================
@@ -116,8 +113,13 @@ export function SurveyList() {
   const [answersTitle, setAnswersTitle] = useState<string>("Employee Answers")
   const [answers, setAnswers] = useState<Array<{ prompt: string; value: string }>>([])
 
-  /* ---------- effects ---------- */
+  /* ---------- dev StrictMode guards ---------- */
+  const didInit = useRef(false)
+  const loadingEditRef = useRef(false)
+
   useEffect(() => {
+    if (didInit.current) return
+    didInit.current = true
     fetchResponses()
     fetchSurveys()
   }, [])
@@ -128,8 +130,6 @@ export function SurveyList() {
 
   async function fetchResponses() {
     setLoadingRows(true)
-    // get responses with joined survey name
-    // Requires FK survey_responses.survey_id -> surveys.id
     const { data, error } = await supabase
       .from("survey_responses")
       .select(`
@@ -277,48 +277,49 @@ export function SurveyList() {
   =================================================== */
 
   async function openEditSurvey(sid: string) {
+    if (loadingEditRef.current) return
+    loadingEditRef.current = true
     setSavingEdit(false)
     setEditSurveyId(sid)
-    // load survey & questions
-    const [{ data: sData, error: sErr }, { data: qData, error: qErr }] = await Promise.all([
-      supabase.from("surveys").select("*").eq("id", sid).single(),
-      supabase.from("survey_questions").select("id, question_type, prompt, options").eq("survey_id", sid).order("id"),
-    ])
-    if (sErr) {
-      console.error(sErr)
+    try {
+      const [{ data: sData, error: sErr }, { data: qData, error: qErr }] = await Promise.all([
+        supabase.from("surveys").select("*").eq("id", sid).single(),
+        supabase.from("survey_questions").select("id, question_type, prompt, options").eq("survey_id", sid).order("id"),
+      ])
+      if (sErr) throw sErr
+      if (qErr) throw qErr
+
+      const draftFromDb: SurveyDraft = {
+        id: newId(),
+        name: sData.name,
+        description: sData.description ?? "",
+        audience: sData.audience,
+        department: sData.department ?? "",
+        employees: (sData.employees ?? []) as string[],
+        dueDate: sData.due_date ?? "",
+        status: "draft",
+        questions: (qData || []).map((q: any) => ({
+          id: q.id,
+          type: q.question_type as QuestionType,
+          prompt: q.prompt,
+          options: q.options ?? undefined,
+        })),
+      }
+      setEditDraft(draftFromDb)
+      setOpenEdit(true)
+    } catch (e) {
+      console.error(e)
       alert("Failed to load survey for editing.")
-      return
+    } finally {
+      loadingEditRef.current = false
     }
-    if (qErr) {
-      console.error(qErr)
-      alert("Failed to load questions.")
-      return
-    }
-    const draftFromDb: SurveyDraft = {
-      id: newId(),
-      name: sData.name,
-      description: sData.description ?? "",
-      audience: sData.audience,
-      department: sData.department ?? "",
-      employees: (sData.employees ?? []) as string[],
-      dueDate: sData.due_date ?? "",
-      status: "draft",
-      questions: (qData || []).map((q: any) => ({
-        id: q.id,
-        type: q.question_type as QuestionType,
-        prompt: q.prompt,
-        options: q.options ?? undefined,
-      })),
-    }
-    setEditDraft(draftFromDb)
-    setOpenEdit(true)
   }
 
   async function saveEdit() {
-    if (!editSurveyId || !editDraft) return
+    if (!editSurveyId || !editDraft || savingEdit) return
     setSavingEdit(true)
     try {
-      // update surveys
+      // 1) update the survey row
       const { error: upErr } = await supabase
         .from("surveys")
         .update({
@@ -332,20 +333,19 @@ export function SurveyList() {
         .eq("id", editSurveyId)
       if (upErr) throw upErr
 
-      // replace questions (simple + reliable)
-      const { error: delErr } = await supabase.from("survey_questions").delete().eq("survey_id", editSurveyId)
-      if (delErr) throw delErr
+      // 2) atomically replace questions in the DB (SECURITY DEFINER RPC)
+      const payload = editDraft.questions.map(q => ({
+        question_type: q.type,
+        prompt: q.prompt,
+        options: q.type === "multi_choice" ? (q.options ?? []) : null,
+      }))
 
-      if (editDraft.questions.length > 0) {
-        const inserts = editDraft.questions.map((q) => ({
-          survey_id: editSurveyId,
-          question_type: q.type,
-          prompt: q.prompt,
-          options: q.type === "multi_choice" ? (q.options ?? []) : null,
-        }))
-        const { error: insErr } = await supabase.from("survey_questions").insert(inserts)
-        if (insErr) throw insErr
-      }
+      // Ensure it's a plain JSON array (avoids "scalar" issues in some envs)
+      const { error: rpcErr } = await supabase.rpc("replace_survey_questions", {
+        p_survey_id: editSurveyId,
+        p_questions: JSON.parse(JSON.stringify(payload)),
+      })
+      if (rpcErr) throw rpcErr
 
       setOpenEdit(false)
       setEditSurveyId(null)
@@ -361,13 +361,16 @@ export function SurveyList() {
 
   async function deleteSurvey(sid: string) {
     if (!confirm("Delete this survey? This also deletes its questions and answers.")) return
-    const { error } = await supabase.from("surveys").delete().eq("id", sid)
+
+    const { error } = await supabase.rpc("delete_survey_cascade", { p_survey_id: sid })
     if (error) {
       console.error(error)
       alert(`Failed to delete: ${error.message}`)
       return
     }
-    setSurveys((prev) => prev.filter((s) => s.id !== sid))
+
+    setSurveys(prev => prev.filter(s => s.id !== sid))
+    await fetchSurveys()
   }
 
   /* ===================================================
@@ -379,7 +382,6 @@ export function SurveyList() {
     setAnswersLoading(true)
     setAnswersTitle(`${resp.firstName} ${resp.lastName} — ${resp.surveyName}`)
 
-    // Get answers joined with prompts
     const { data, error } = await supabase
       .from("survey_answers")
       .select(`
@@ -402,7 +404,6 @@ export function SurveyList() {
         return { prompt, value }
       })
       setAnswers(mapped)
-      // mark as viewed locally
       setRows((prev) => prev.map((row) => (row.id === resp.id ? { ...row, viewed: true } : row)))
     }
 

@@ -54,7 +54,7 @@ const navigation = [
   { name: "Requests", href: "/requests", icon: ClipboardList },
   { name: "Requests Employee", href: "/requests-employee", icon: ClipboardList },
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
-  { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
+  //{ name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   //{ name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
   //{ name: "PayStub", href: "/paystub", icon: DollarSign },
