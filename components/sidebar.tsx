@@ -25,17 +25,17 @@ const navigation = [
   { name: "Employees", href: "/employees", icon: Users },
   { name: "Employees Hierarchy", href: "/employee-hierarchy", icon: Users },
   { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Leaves", href: "/leaves", icon: Plane },
-  { name: "PayStub", href: "/paystub", icon: DollarSign },
   { name: "Survey", href: "/survey", icon: MessageSquare },
   { name: "Survey Employee", href: "/survey-employee", icon: MessageSquare },
   { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
   { name: "Requests", href: "/requests", icon: ClipboardList },
-  { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
+  { name: "Requests Employee", href: "/requests-employee", icon: ClipboardList },
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
-  { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
+  { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
+  //{ name: "PayStub", href: "/paystub", icon: DollarSign },
+  //{ name: "Leaves", href: "/leaves", icon: Plane },
 
 ]
 
