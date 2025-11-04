@@ -17,7 +17,7 @@ import {
   Sparkles,
   Bell,
 } from "lucide-react"
-
+/*
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Announcement", href: "/announcement", icon: Bell },
@@ -38,8 +38,28 @@ const navigation = [
   { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
   { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
   { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
-  { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
-  { name: "Admin Benefits", href: "/admin/benefits", icon: Sparkles },
+
+]*/
+
+const navigation = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Announcement", href: "/announcement", icon: Bell },
+  { name: "Schedule", href: "/schedule", icon: Calendar },
+  { name: "Employees", href: "/employees", icon: Users },
+  { name: "Employees Hierarchy", href: "/employee-hierarchy", icon: Users },
+  { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Survey", href: "/survey", icon: MessageSquare },
+  { name: "Survey Employee", href: "/survey-employee", icon: MessageSquare },
+  { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
+  { name: "Requests", href: "/requests", icon: ClipboardList },
+  { name: "Requests Employee", href: "/requests-employee", icon: ClipboardList },
+  { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
+  //{ name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
+  //{ name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
+  { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
+  //{ name: "PayStub", href: "/paystub", icon: DollarSign },
+  //{ name: "Leaves", href: "/leaves", icon: Plane },
+
 ]
 
 export function Sidebar() {
@@ -48,10 +68,12 @@ export function Sidebar() {
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 h-18 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="MapleHR logo" className="w-8 h-8 object-contain" />
-          <span className="text-xl font-semibold text-gray-900">MapleHR</span>
+          <div className="text-lg font-semibold text-gray-900 tracking-tight">
+            Maple<span style={{ color: "#2EB36D" }}>HR</span>
+          </div>
         </div>
       </div>
 
@@ -67,7 +89,7 @@ export function Sidebar() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative",
-                    isActive ? "bg-green-50 text-green-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                    isActive ? "bg-green-50 text-green-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                   )}
                 >
                   <item.icon className="w-5 h-5" />
