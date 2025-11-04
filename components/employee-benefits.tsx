@@ -39,39 +39,54 @@ export default function EmployeeBenefits() {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null));
   }, []);
 
-  async function fetchMine() {
-    if (!uid) return;
-    setLoading(true);
-    setMsg(null);
+async function fetchMine() {
+  setLoading(true);
+  setMsg(null);
 
-    // fetch enrollments
+  try {
+    // Fetch benefits with proper join to plans
     const { data: eb, error } = await supabase
       .from("employee_benefits")
-      .select("*")
-      .eq("user_id", uid)
+      .select(`
+        *,
+        benefits_plans (
+          id,
+          name,
+          provider,
+          description,
+          coverage,
+          premium_employee,
+          premium_employer,
+          employee_cost,
+          employer_cost
+        )
+      `)
       .order("created_at", { ascending: false });
 
     if (error) {
-      setMsg(error.message);
+      console.error('Error fetching benefits:', error);
+      setMsg(`Error: ${error.message}`);
       setRows([]);
-      setLoading(false);
-      return;
+    } else {
+      console.log('Fetched benefits with plans:', eb);
+      
+      // Transform the data to match your type
+      const merged = (eb || []).map((r: any) => ({
+        ...r,
+        plan: r.benefits_plans || null
+      })) as EmpBen[];
+      
+      setRows(merged);
+      console.log('Merged rows:', merged);
     }
-
-    // fetch plan catalog for joins
-    const { data: plans } = await supabase.from("benefits_plans").select("*");
-    const planById = new Map<string, Plan>(
-      (plans ?? []).map((p: any) => [p.id, p as Plan])
-    );
-
-    const merged = (eb ?? []).map((r: any) => ({
-      ...r,
-      plan: r.plan_id ? planById.get(r.plan_id) ?? null : null,
-    })) as EmpBen[];
-
-    setRows(merged);
+  } catch (error: any) {
+    console.error('Unexpected error:', error);
+    setMsg(`Error: ${error.message}`);
+    setRows([]);
+  } finally {
     setLoading(false);
   }
+}
 
   React.useEffect(() => {
     if (uid) fetchMine();

@@ -1,4 +1,5 @@
-import HRBenefitsAdmin from "@/components/hr-benefits-admin";
-export default function HRBenefitsAdminPage() {
-  return <HRBenefitsAdmin />;
+import AdminBenefits from "@/components/admin-benefits";
+
+export default function AdminBenefitsPage() {
+  return <AdminBenefits />;
 }
