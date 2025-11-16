@@ -17,21 +17,7 @@ import {
   Sparkles,
   Bell,
 } from "lucide-react"
-/*
-  { name: "PayStub", href: "/paystub", icon: DollarSign },
-  { name: "Finances", href: "/finances", icon: DollarSign },
-  { name: "Survey", href: "/survey", icon: MessageSquare },
-  { name: "Survey Employee", href: "/survey-employee", icon: MessageSquare },
-  { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
-  { name: "Requests", href: "/admin/requests", icon: ClipboardList },
-  { name: "Employee List", href: "/admin/viewemployee", icon: FileUser },
-  { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
-  { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
-  { name: "Submit Expense Claim", href: "/employeeview/submitclaim", icon: DollarSign },
-  { name: "Time Off", href: "/employeeview/timeoff", icon: Calendar },
-  { name: "My Requests", href: "/requests-employee", icon: ClipboardList },
 
-]*/
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
