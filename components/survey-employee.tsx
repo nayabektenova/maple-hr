@@ -1,4 +1,3 @@
-// components/survey-employee.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -30,13 +29,25 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /* -------------------- Types -------------------- */
-type QuestionType = "short_text" | "long_text" | "rating" | "multi_choice";
+
+
+type QuestionType =
+  | "short_text"
+  | "long_text"
+  | "rating"
+  | "multi_choice"
+  | "rating_1_4"
+  | "yes_no"
+  | "single_choice";
+
 
 type SurveyQ = {
   id: string;
   question_type: QuestionType;
   prompt: string;
   options?: string[] | null;
+  feature_key?: string | null;
+  help_text?: string | null;
 };
 
 type Survey = {
@@ -48,7 +59,7 @@ type Survey = {
 };
 
 /* =========================================================
-   Employee Survey Component (no auth; user enters fields)
+   Employee Survey Component
    ========================================================= */
 export default function SurveyEmployee() {
   const [search, setSearch] = useState("");
@@ -59,48 +70,97 @@ export default function SurveyEmployee() {
   const [open, setOpen] = useState(false);
   const [activeSurvey, setActiveSurvey] = useState<Survey | null>(null);
 
-  // required respondent fields
+  // respondent fields
   const [employeeId, setEmployeeId] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
-  // local form state: per question id
+  // local answers: question_id -> value
   const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({});
 
   useEffect(() => {
     refreshSurveys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* =========================================================
+     Load surveys + Attrition Survey Demo
+     ========================================================= */
   async function refreshSurveys() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("surveys")
-      .select(
-        `
-        id,
-        name,
-        description,
-        due_date,
-        survey_questions (
-          id,
-          question_type,
-          prompt,
-          options
-        )
-      `
-      );
 
-    if (error) {
-      console.error(error);
+    try {
+      const { data: baseData, error: baseErr } = await supabase
+        .from("surveys")
+        .select(
+          `
+          id,
+          name,
+          description,
+          due_date,
+          survey_questions (
+            id,
+            question_type,
+            prompt,
+            options
+          )
+        `
+        );
+
+      if (baseErr) throw baseErr;
+
+      let list: Survey[] = (baseData || []) as unknown as Survey[];
+
+      const { data: attrQ, error: attrErr } = await supabase
+        .from("attrition_survey_questions")
+        .select(
+          `
+          id,
+          feature_key,
+          prompt,
+          help_text,
+          question_type,
+          options,
+          is_required,
+          sort_order
+        `
+        )
+        .order("sort_order", { ascending: true });
+
+      if (!attrErr && attrQ && attrQ.length > 0) {
+        const attritionQuestions: SurveyQ[] = (attrQ as any[]).map((q) => ({
+          id: q.id,
+          question_type: q.question_type as QuestionType, // rating_1_4 | yes_no | single_choice
+          prompt: q.prompt,
+          options: q.options ?? null,
+          feature_key: q.feature_key,
+          help_text: q.help_text ?? null,
+        }));
+
+        const attritionSurvey: Survey = {
+          id: "ATTRITION_DEMO", 
+          name: "Attrition Survey Demo",
+          description:
+            "Short engagement & context survey used to estimate resignation risk.",
+          due_date: null,
+          survey_questions: attritionQuestions,
+        };
+
+        list = [...list, attritionSurvey];
+      }
+
+      setSurveys(list);
+    } catch (e) {
+      console.error("Error loading surveys:", e);
       setSurveys([]);
-    } else {
-      setSurveys((data || []) as unknown as Survey[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
+  /* =========================================================
+     Search / filter
+     ========================================================= */
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return surveys;
@@ -111,16 +171,26 @@ export default function SurveyEmployee() {
     );
   }, [surveys, search]);
 
+  /* =========================================================
+     Modal helpers
+     ========================================================= */
+
   function openAnswerModal(s: Survey) {
     const init: Record<string, string | number | string[]> = {};
+
     for (const q of s.survey_questions) {
-      if (q.question_type === "multi_choice") init[q.id] = [];
-      else if (q.question_type === "rating") init[q.id] = 0;
-      else init[q.id] = "";
+      if (q.question_type === "multi_choice") {
+        init[q.id] = [];
+      } else if (q.question_type === "rating" || q.question_type === "rating_1_4") {
+        init[q.id] = 0;
+      } else {
+        // short_text, long_text, yes_no, single_choice
+        init[q.id] = "";
+      }
     }
+
     setAnswers(init);
 
-    // clear respondent fields for each new open
     setEmployeeId("");
     setFirstName("");
     setLastName("");
@@ -140,6 +210,10 @@ export default function SurveyEmployee() {
     return null;
   }
 
+  /* =========================================================
+     Submit: route by survey type
+     ========================================================= */
+
   async function submitAnswers() {
     if (!activeSurvey) return;
 
@@ -149,11 +223,21 @@ export default function SurveyEmployee() {
       return;
     }
 
+    if (activeSurvey.id === "ATTRITION_DEMO") {
+      await submitAttritionSurvey();
+    } else {
+      await submitStandardSurvey();
+    }
+  }
+
+
+  async function submitStandardSurvey() {
+    if (!activeSurvey) return;
+
     setSubmitting(true);
     try {
       const empId = employeeId.trim();
 
-      // Enforce one submission per (survey_id, employee_id)
       const { data: exists, error: existsErr } = await supabase
         .from("survey_responses")
         .select("id")
@@ -169,7 +253,6 @@ export default function SurveyEmployee() {
         return;
       }
 
-      // Create response (include required legacy columns)
       const { data: respIns, error: respErr } = await supabase
         .from("survey_responses")
         .insert([
@@ -179,17 +262,16 @@ export default function SurveyEmployee() {
             status: "Pending",
             first_name: firstName.trim(),
             last_name: lastName.trim(),
-            survey: activeSurvey.name, // legacy text column storing survey name
+            survey: activeSurvey.name,
           },
         ])
         .select("id")
         .single();
 
       if (respErr) throw respErr;
-
       const responseId = respIns.id as string;
 
-      // Build answers rows
+      // Ответы по вопросам
       const inserts = activeSurvey.survey_questions.map((q) => {
         const v = answers[q.id];
         switch (q.question_type) {
@@ -201,6 +283,7 @@ export default function SurveyEmployee() {
               answer_text: typeof v === "string" ? v : String(v ?? ""),
             };
           case "rating":
+          case "rating_1_4":
             return {
               response_id: responseId,
               question_id: q.id,
@@ -211,6 +294,13 @@ export default function SurveyEmployee() {
               response_id: responseId,
               question_id: q.id,
               answer_opts: Array.isArray(v) ? v : [],
+            };
+          case "yes_no":
+          case "single_choice":
+            return {
+              response_id: responseId,
+              question_id: q.id,
+              answer_text: typeof v === "string" ? v : String(v ?? ""),
             };
           default:
             return {
@@ -224,7 +314,6 @@ export default function SurveyEmployee() {
       const { error: ansErr } = await supabase.from("survey_answers").insert(inserts);
       if (ansErr) throw ansErr;
 
-      // Optional: bump status to Submitted (kept for your existing trigger)
       const { error: updErr } = await supabase
         .from("survey_responses")
         .update({ status: "Submitted" })
@@ -240,6 +329,88 @@ export default function SurveyEmployee() {
       setSubmitting(false);
     }
   }
+
+  /* ---------- 2) Attrition Survey Demo -> attrition_survey_responses ---------- */
+
+  async function submitAttritionSurvey() {
+    if (!activeSurvey) return;
+
+    setSubmitting(true);
+    try {
+      const empId = employeeId.trim();
+
+      const { data: exists, error: existsErr } = await supabase
+        .from("attrition_survey_responses")
+        .select("id")
+        .eq("employee_id", empId)
+        .limit(1);
+
+      if (existsErr) throw existsErr;
+
+      if (exists && exists.length > 0) {
+        alert("You have already submitted the attrition survey with this Employee ID.");
+        setSubmitting(false);
+        return;
+      }
+
+      const featurePayload: Record<string, any> = {};
+
+      for (const q of activeSurvey.survey_questions) {
+        if (!q.feature_key) continue;
+        const raw = answers[q.id];
+
+        switch (q.question_type) {
+          case "rating_1_4": {
+            const n =
+              typeof raw === "number"
+                ? raw
+                : Number(raw ?? 0);
+            featurePayload[q.feature_key] =
+              n >= 1 && n <= 4 ? n : null;
+            break;
+          }
+          case "yes_no": {
+            featurePayload[q.feature_key] =
+              typeof raw === "string" ? raw : "";
+            break;
+          }
+          case "single_choice": {
+            featurePayload[q.feature_key] =
+              typeof raw === "string" ? raw : "";
+            break;
+          }
+          default: {
+            featurePayload[q.feature_key] = raw ?? null;
+            break;
+          }
+        }
+      }
+
+      const insertRow = {
+        employee_id: empId,
+        employee_name: `${firstName.trim()} ${lastName.trim()}`,
+        ...featurePayload,
+      };
+
+      const { error: insErr } = await supabase
+        .from("attrition_survey_responses")
+        .insert([insertRow]);
+
+      if (insErr) throw insErr;
+
+      alert("Thank you! Your attrition survey has been submitted.");
+      setOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      alert(`Failed to submit attrition survey: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /* =========================================================
+     Render
+     ========================================================= */
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -271,7 +442,14 @@ export default function SurveyEmployee() {
             <TableBody>
               {visible.map((s) => (
                 <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {s.name}
+                    {s.id === "ATTRITION_DEMO" && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                        Attrition
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-gray-600">
                     {s.description ?? "—"}
                   </TableCell>
@@ -292,7 +470,10 @@ export default function SurveyEmployee() {
 
               {visible.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-gray-500 py-8">
+                  <TableCell
+                    colSpan={4}
+                    className="text-center text-gray-500 py-8"
+                  >
                     No surveys available.
                   </TableCell>
                 </TableRow>
@@ -304,14 +485,15 @@ export default function SurveyEmployee() {
 
       {/* Answer modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        {/* SIMPLE: make the whole popup scrollable */}
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {activeSurvey ? `Answer: ${activeSurvey.name}` : "Answer survey"}
             </DialogTitle>
             {activeSurvey?.description && (
-              <p className="text-sm text-gray-600 mt-1">{activeSurvey.description}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {activeSurvey.description}
+              </p>
             )}
           </DialogHeader>
 
@@ -357,10 +539,18 @@ export default function SurveyEmployee() {
               {/* Dynamic questions */}
               <div className="space-y-4">
                 {activeSurvey.survey_questions.map((q, idx) => (
-                  <div key={q.id} className="rounded-md border border-gray-200 p-3">
-                    <Label className="block mb-2">
+                  <div
+                    key={q.id}
+                    className="rounded-md border border-gray-200 p-3"
+                  >
+                    <Label className="block mb-1">
                       {idx + 1}. {q.prompt}
                     </Label>
+                    {q.help_text && (
+                      <div className="text-xs text-gray-500 mb-2">
+                        {q.help_text}
+                      </div>
+                    )}
 
                     {q.question_type === "short_text" && (
                       <Input
@@ -378,20 +568,32 @@ export default function SurveyEmployee() {
                       />
                     )}
 
-                    {q.question_type === "rating" && (
+                    {(q.question_type === "rating" ||
+                      q.question_type === "rating_1_4") && (
                       <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <Button
-                            key={n}
-                            type="button"
-                            variant={(answers[q.id] as number) === n ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => updateAnswer(q.id, n)}
-                            className={(answers[q.id] as number) === n ? "bg-blue-600 hover:bg-blue-700" : ""}
-                          >
-                            {n}
-                          </Button>
-                        ))}
+                        {Array.from({
+                          length: q.question_type === "rating_1_4" ? 4 : 5,
+                        }).map((_, i) => {
+                          const n = i + 1;
+                          const current = answers[q.id] as number;
+                          const active = current === n;
+                          return (
+                            <Button
+                              key={n}
+                              type="button"
+                              variant={active ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => updateAnswer(q.id, n)}
+                              className={
+                                active
+                                  ? "bg-blue-600 hover:bg-blue-700"
+                                  : ""
+                              }
+                            >
+                              {n}
+                            </Button>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -412,7 +614,80 @@ export default function SurveyEmployee() {
                                 else next.add(opt);
                                 updateAnswer(q.id, Array.from(next));
                               }}
-                              className={checked ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              className={
+                                checked
+                                  ? "bg-blue-600 hover:bg-blue-700"
+                                  : ""
+                              }
+                            >
+                              {opt}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {q.question_type === "yes_no" && (
+                      <div className="flex gap-2">
+                        {["Yes", "No"].map((opt) => {
+                          const current = (answers[q.id] as string) ?? "";
+                          const checked = current === opt;
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={checked ? "default" : "outline"}
+                              size="sm"
+                              onClick={() =>
+                                updateAnswer(
+                                  q.id,
+                                  checked ? "" : opt
+                                )
+                              }
+                              className={
+                                checked
+                                  ? "bg-blue-600 hover:bg-blue-700"
+                                  : ""
+                              }
+                            >
+                              {opt}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                  
+                    {q.question_type === "single_choice" && (!q.options || q.options.length === 0) && (
+                      <Input
+                        value={(answers[q.id] as string) ?? ""}
+                        onChange={(e) => updateAnswer(q.id, e.target.value)}
+                        placeholder="Enter a value"
+                      />
+                    )}
+
+                    {q.question_type === "single_choice" && q.options && q.options.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {q.options.map((opt) => {
+                          const current = (answers[q.id] as string) ?? "";
+                          const checked = current === opt;
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={checked ? "default" : "outline"}
+                              size="sm"
+                              onClick={() =>
+                                updateAnswer(
+                                  q.id,
+                                  checked ? "" : opt
+                                )
+                              }
+                              className={
+                                checked
+                                  ? "bg-blue-600 hover:bg-blue-700"
+                                  : ""
+                              }
                             >
                               {opt}
                             </Button>
