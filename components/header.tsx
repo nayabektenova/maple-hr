@@ -114,7 +114,7 @@ export function Header() {
 
   // Navigate to notifications page
   const handleNotificationClick = () => {
-    router.push("/notifications")
+    router.push("/notification")
   }
 
   return (
