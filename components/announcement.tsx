@@ -13,6 +13,9 @@ import {
   Bell,
   Users,
   CheckSquare,
+  Eye,
+  Trash2,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,19 +29,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-
-/**
- * AnnouncementList component with Create Announcement modal
- *
- * Replace your current components/announcement.tsx with this file.
- *
- * Requirements:
- * - Supabase tables: announcements, announcement_responses, announcement_comments, employees
- * - Supabase storage bucket (optional) named "attachments" for file uploads (or remove upload part)
- *
- * Exported as named: AnnouncementList
- */
 
 // ---------- small helpers ----------
 const CustomSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
@@ -73,6 +70,7 @@ type Announcement = {
   join_link?: string | null;
   pinned?: boolean;
   department?: string | null;
+  isRead?: boolean;
 };
 
 type Employee = {
@@ -107,7 +105,6 @@ function CreateAnnouncementModal({
 
   useEffect(() => {
     if (!open) {
-      // reset form when closed
       setTitle("");
       setBody("");
       setType("general");
@@ -122,7 +119,6 @@ function CreateAnnouncementModal({
   }, [open]);
 
   async function handleFileUpload(file: File) {
-    // Adjust bucket name if different. This will put file at attachments/<timestamp>-<filename>
     const timestamp = Date.now();
     const key = `attachments/${timestamp}-${file.name.replace(/\s+/g, "_")}`;
     const { data, error } = await supabase.storage
@@ -135,7 +131,6 @@ function CreateAnnouncementModal({
       console.error("file upload error", error);
       throw error;
     }
-    // get public url
     const { data: urlData } = supabase.storage
       .from("attachments")
       .getPublicUrl(data.path);
@@ -143,167 +138,85 @@ function CreateAnnouncementModal({
   }
 
   async function handleSubmit(e?: React.FormEvent) {
-  if (e) e.preventDefault();
-  if (!title.trim()) {
-    alert("Title is required");
-    return;
-  }
-  setSaving(true);
-  try {
-    let attachment_url: string | null = null;
-    if (attachmentFile) {
-      try {
-        attachment_url = await handleFileUpload(attachmentFile);
-      } catch (err) {
-        console.warn("attachment upload failed, continuing without it", err);
-        attachment_url = null;
-      }
-    }
-
-    // Get current user
-    // const { data: userData } = await supabase.auth.getUser();
-
-    /* this part needed to be fixed and i fixed this bescaues we are not saveing the information in our table where the created_by doesnot exist */
-
-    // Format datetime properly for Supabase (ISO 8601 format)
-    const formatDateTime = (dateTimeStr: string) => {
-      if (!dateTimeStr) return null;
-      return new Date(dateTimeStr).toISOString();
-    };
-
-    const formatDate = (dateStr: string) => {
-      if (!dateStr) return null;
-      return new Date(dateStr + 'T00:00:00').toISOString();
-    };
-
-    const payload: any = {
-      title: title.trim(),
-      body: body.trim() || null,
-      type,
-      pinned,
-      department: department || null,
-      attachment_url,
-      join_link: joinLink.trim() || null,
-      start_at: startAt ? formatDateTime(startAt) : null,
-      due_at: dueAt ? formatDate(dueAt) : null,
-    };
-
-    // if (userData?.user?.id) {
-    //   payload.created_by = userData.user.id;
-    // }
-
-    // the created_by will be set on server based on auth user or use client: attempt to get user
-    // Removed the created_by assignment to avoid issues
-
-    console.log("Inserting payload:", payload);
-
-    const { data, error } = await supabase
-      .from("announcements")
-      .insert([payload])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Insert announcement error:", error);
-      alert(`Failed to create announcement: ${error.message}\nDetails: ${JSON.stringify(error.details || {})}`);
+    if (e) e.preventDefault();
+    if (!title.trim()) {
+      alert("Title is required");
       return;
     }
+    setSaving(true);
+    try {
+      let attachment_url: string | null = null;
+      if (attachmentFile) {
+        try {
+          attachment_url = await handleFileUpload(attachmentFile);
+        } catch (err) {
+          console.warn("attachment upload failed, continuing without it", err);
+          attachment_url = null;
+        }
+      }
 
-    if (data) {
-      const created: Announcement = {
-        id: data.id,
-        title: data.title,
-        body: data.body,
-        type: data.type,
-        created_by: data.created_by,
-        created_at: data.created_at,
-        start_at: data.start_at,
-        due_at: data.due_at,
-        attachment_url: data.attachment_url,
-        join_link: data.join_link,
-        pinned: !!data.pinned,
-        department: data.department ?? null,
+      const formatDateTime = (dateTimeStr: string) => {
+        if (!dateTimeStr) return null;
+        return new Date(dateTimeStr).toISOString();
       };
-      onCreated(created);
-      onClose();
+
+      const formatDate = (dateStr: string) => {
+        if (!dateStr) return null;
+        return new Date(dateStr + 'T00:00:00').toISOString();
+      };
+
+      const payload: any = {
+        title: title.trim(),
+        body: body.trim() || null,
+        type,
+        pinned,
+        department: department || null,
+        attachment_url,
+        join_link: joinLink.trim() || null,
+        start_at: startAt ? formatDateTime(startAt) : null,
+        due_at: dueAt ? formatDate(dueAt) : null,
+      };
+
+      console.log("Inserting payload:", payload);
+
+      const { data, error } = await supabase
+        .from("announcements")
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Insert announcement error:", error);
+        alert(`Failed to create announcement: ${error.message}\nDetails: ${JSON.stringify(error.details || {})}`);
+        return;
+      }
+
+      if (data) {
+        const created: Announcement = {
+          id: data.id,
+          title: data.title,
+          body: data.body,
+          type: data.type,
+          created_by: data.created_by,
+          created_at: data.created_at,
+          start_at: data.start_at,
+          due_at: data.due_at,
+          attachment_url: data.attachment_url,
+          join_link: data.join_link,
+          pinned: !!data.pinned,
+          department: data.department ?? null,
+          isRead: false,
+        };
+        onCreated(created);
+        onClose();
+      }
+    } catch (err: any) {
+      console.error("Unexpected create error:", err);
+      alert(`Unexpected error creating announcement: ${err.message || err}`);
+    } finally {
+      setSaving(false);
     }
-  } catch (err: any) {
-    console.error("Unexpected create error:", err);
-    alert(`Unexpected error creating announcement: ${err.message || err}`);
-  } finally {
-    setSaving(false);
   }
-}
-
-  // async function handleSubmit(e?: React.FormEvent) {
-  //   if (e) e.preventDefault();
-  //   if (!title.trim()) {
-  //     alert("Title is required");
-  //     return;
-  //   }
-  //   setSaving(true);
-  //   try {
-  //     let attachment_url: string | null = null;
-  //     if (attachmentFile) {
-  //       try {
-  //         attachment_url = await handleFileUpload(attachmentFile);
-  //       } catch (err) {
-  //         console.warn("attachment upload failed, continuing without it", err);
-  //         attachment_url = null;
-  //       }
-  //     }
-
-  //     const payload: any = {
-  //       title: title.trim(),
-  //       body: body.trim(),
-  //       type,
-  //       pinned,
-  //       department: department || null,
-  //       attachment_url,
-  //       join_link: joinLink || null,
-  //       start_at: startAt || null,
-  //       due_at: dueAt || null,
-  //     };
-
-  //     // created_by will be set on server based on auth user or use client: attempt to get user
-  //     const { data: userData } = await supabase.auth.getUser();
-  //     if (userData?.user?.id) payload.created_by = userData.user.id;
-
-  //     const { data, error } = await supabase
-  //       .from("announcements")
-  //       .insert([payload])
-  //       .select()
-  //       .single();
-
-  //     if (error) {
-  //       console.error("insert announcement error", error);
-  //       alert("Failed to create announcement. See console.");
-  //     } else {
-  //       // notify parent to refresh
-  //       const created: Announcement = {
-  //         id: data.id,
-  //         title: data.title,
-  //         body: data.body,
-  //         type: data.type,
-  //         created_by: data.created_by,
-  //         created_at: data.created_at,
-  //         start_at: data.start_at,
-  //         due_at: data.due_at,
-  //         attachment_url: data.attachment_url,
-  //         join_link: data.join_link,
-  //         pinned: !!data.pinned,
-  //         department: data.department ?? null,
-  //       };
-  //       onCreated(created);
-  //       onClose();
-  //     }
-  //   } catch (err) {
-  //     console.error("unexpected create error", err);
-  //     alert("Unexpected error creating announcement.");
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // }
 
   if (!open) return null;
 
@@ -379,7 +292,6 @@ function CreateAnnouncementModal({
           </div>
         </div>
 
-        {/* Dates section with labels */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col">
             <label className="text-sm text-gray-700 mb-1">
@@ -406,7 +318,6 @@ function CreateAnnouncementModal({
           </div>
         </div>
 
-        {/* Attachment section with green border box */}
         <div className="border border-green-400 rounded-lg p-3 bg-green-50/30 mt-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Attachment (optional)
@@ -449,7 +360,6 @@ function CreateAnnouncementModal({
 
 // ---------- AnnouncementList main export ----------
 export function AnnouncementList() {
-  // UI State (header similar to schedule.tsx)
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"" | AnnouncementType>("");
   const [departmentFilter, setDepartmentFilter] = useState<string>("");
@@ -457,13 +367,12 @@ export function AnnouncementList() {
   const [alphaSort, setAlphaSort] = useState(false);
   const [pageStart, setPageStart] = useState<Date>(() => new Date());
 
-  // Data
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Departments derived
   const departments = useMemo(
     () =>
       Array.from(
@@ -472,16 +381,28 @@ export function AnnouncementList() {
     [employees]
   );
 
+  // Get current user
+  useEffect(() => {
+    async function getCurrentUser() {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user?.id) {
+        setCurrentUserId(data.user.id);
+      }
+    }
+    getCurrentUser();
+  }, []);
 
-  // initial load
-  // this loads both employees (for depts) and announcements
-  // this is the fetch that gets announcements from supabase
+  // Initial load
   useEffect(() => {
     let mounted = true;
     async function load() {
       setLoading(true);
       try {
-        // employees
+        // Get current user for read status
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+
+        // Employees
         const { data: empData, error: empErr } = await supabase
           .from("employees")
           .select("id, first_name, last_name, department");
@@ -497,7 +418,7 @@ export function AnnouncementList() {
           );
         }
 
-        // announcements
+        // Announcements
         const { data: annData, error: annErr } = await supabase
           .from("announcements")
           .select("*")
@@ -505,7 +426,21 @@ export function AnnouncementList() {
           .order("created_at", { ascending: false });
 
         if (annErr) console.error("announcements err", annErr);
+        
         if (annData && mounted) {
+          // Get read status for each announcement
+          let readAnnouncementIds: string[] = [];
+          if (userId) {
+            const { data: readData } = await supabase
+              .from("announcement_reads")
+              .select("announcement_id")
+              .eq("user_id", userId);
+            
+            if (readData) {
+              readAnnouncementIds = readData.map((r: any) => r.announcement_id);
+            }
+          }
+
           setAnnouncements(
             annData.map((r: any) => ({
               id: r.id,
@@ -520,6 +455,7 @@ export function AnnouncementList() {
               join_link: r.join_link,
               pinned: !!r.pinned,
               department: r.department ?? null,
+              isRead: readAnnouncementIds.includes(r.id),
             }))
           );
         }
@@ -535,9 +471,67 @@ export function AnnouncementList() {
     };
   }, []);
 
-  // filtered list
-  // this filters the announcements based on the search and filters
-  // it is memoized for performance
+  // Mark announcement as read
+  async function markAsRead(announcementId: string) {
+    if (!currentUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from("announcement_reads")
+        .upsert(
+          { user_id: currentUserId, announcement_id: announcementId },
+          { onConflict: "user_id,announcement_id" }
+        );
+
+      if (error) {
+        console.error("Error marking as read:", error);
+        alert("Failed to mark as read");
+        return;
+      }
+
+      // Update local state
+      setAnnouncements((prev) =>
+        prev.map((a) =>
+          a.id === announcementId ? { ...a, isRead: true } : a
+        )
+      );
+    } catch (err) {
+      console.error("Unexpected error marking as read:", err);
+    }
+  }
+
+  // Delete announcement
+  async function deleteAnnouncement(announcementId: string) {
+    if (!confirm("Are you sure you want to delete this announcement?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("announcements")
+        .delete()
+        .eq("id", announcementId);
+
+      if (error) {
+        console.error("Error deleting announcement:", error);
+        alert("Failed to delete announcement");
+        return;
+      }
+
+      // Update local state
+      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId));
+    } catch (err) {
+      console.error("Unexpected error deleting announcement:", err);
+    }
+  }
+
+  // View announcement (placeholder for now)
+  function viewAnnouncement(announcementId: string) {
+    // TODO: Navigate to detail page or open modal
+    console.log("View announcement:", announcementId);
+    alert("View functionality - to be implemented");
+  }
+
   const filtered = useMemo(() => {
     let rows = announcements.slice();
     if (searchTerm.trim()) {
@@ -553,7 +547,6 @@ export function AnnouncementList() {
       rows = rows.filter((r) => r.department === departmentFilter);
     if (showPinnedOnly) rows = rows.filter((r) => !!r.pinned);
     if (alphaSort) rows = rows.sort((a, b) => a.title.localeCompare(b.title));
-    // pinned first
     rows = rows.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
     return rows;
   }, [
@@ -571,10 +564,7 @@ export function AnnouncementList() {
     setPageStart(d);
   }
 
-  // called when a new announcement is created by modal
-  // adds to top of list
   function handleCreated(created: Announcement) {
-    // add to top of list
     setAnnouncements((prev) => [created, ...prev]);
   }
 
@@ -696,14 +686,16 @@ export function AnnouncementList() {
 
           <TableBody>
             {filtered.map((ann) => (
-              <TableRow key={ann.id} className="hover:bg-gray-50">
+              <TableRow 
+                key={ann.id} 
+                className={`hover:bg-gray-50 ${!ann.isRead ? 'bg-blue-50/30' : ''}`}
+              >
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={async () => {
-                        // toggle pinned quickly (optimistic)
                         const newPinned = !ann.pinned;
                         setAnnouncements((prev) =>
                           prev.map((a) =>
@@ -722,9 +714,34 @@ export function AnnouncementList() {
                         }`}
                       />
                     </Button>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          onClick={() => markAsRead(ann.id)}
+                          disabled={ann.isRead}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Mark Read
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => viewAnnouncement(ann.id)}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => deleteAnnouncement(ann.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </TableCell>
 
@@ -732,6 +749,11 @@ export function AnnouncementList() {
                   <div className="font-medium flex flex-col">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{ann.title}</span>
+                      {!ann.isRead && (
+                        <span className="flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                          !
+                        </span>
+                      )}
                       {ann.type === "recognition" && (
                         <span className="text-xs px-2 py-1 rounded bg-green-50 text-green-800">
                           Recognition
@@ -803,7 +825,6 @@ export function AnnouncementList() {
 
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {/* simple placeholder actions - extend as needed */}
                     {ann.join_link && (
                       <a href={ann.join_link} target="_blank" rel="noreferrer">
                         <Button size="sm" variant="outline">
