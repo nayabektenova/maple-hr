@@ -9,10 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DialogFooter, DialogTrigger
 } from "@/components/ui/dialog"
@@ -45,6 +41,8 @@ type Question = {
   type: QuestionType
   prompt: string
   options?: string[]
+  attritionId?: string        // attrition_survey_questions.id
+  featureKey?: string         // feature_key
 }
 
 type SurveyDraft = {
@@ -68,18 +66,99 @@ type ResponseRow = {
 }
 
 type SurveyRow = {
-  id: string                 // surveys.id
+  id: string                
   name: string
   description?: string | null
   due_date?: string | null
   audience: "all" | "department" | "individuals"
   department?: string | null
   employees?: string[] | null
+  isAttrition?: boolean   
 }
 
 /* -------------------- constants -------------------- */
 
 const DEPARTMENTS = ["Development", "Marketing", "Finance", "Administration", "Maintenance", "Cybersecurity"]
+
+const ATTRITION_SURVEY_ID = "attrition-demo"
+const ATTRITION_SURVEY_NAME = "Attrition Survey Demo"
+
+/* -------------------- attrition helpers -------------------- */
+
+type AttritionQuestionRow = {
+  id: string
+  feature_key: string
+  prompt: string
+  help_text?: string | null
+  question_type: string
+  options: any
+  is_required: boolean
+  sort_order: number
+}
+
+function coerceOptionsArray(raw: any): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw as string[]
+  try {
+    const parsed = JSON.parse(raw as string)
+    return Array.isArray(parsed) ? (parsed as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+function mapAttritionTypeToUi(t: string): QuestionType {
+  switch (t) {
+    case "rating_1_4":
+      return "rating"
+    case "yes_no":
+    case "single_choice":
+      return "multi_choice"
+    default:
+      return "short_text"
+  }
+}
+
+function mapAttritionRowToQuestion(row: AttritionQuestionRow): Question {
+  const baseType = mapAttritionTypeToUi(row.question_type)
+
+  let opts: string[] | undefined = undefined
+  if (row.question_type === "yes_no") {
+    opts = ["Yes", "No"]
+  } else if (row.question_type === "single_choice") {
+    const arr = coerceOptionsArray(row.options)
+    opts = arr.length ? arr : undefined
+  }
+
+  return {
+    id: row.id, 
+    type: baseType,
+    prompt: row.prompt,
+    options: opts,
+    attritionId: row.id,
+    featureKey: row.feature_key,
+  }
+}
+
+function mapUiTypeToAttrition(t: QuestionType, q: Question): string {
+  if (t === "rating") return "rating_1_4"
+  if (t === "multi_choice") {
+    const opts = (q.options ?? []).map(o => o.toLowerCase())
+    if (opts.length === 2 && opts.includes("yes") && opts.includes("no")) {
+      return "yes_no"
+    }
+    return "single_choice"
+  }
+  if (t === "short_text" || t === "long_text") return "short_text"
+  return "short_text"
+}
+
+function mapUiOptionsToAttrition(q: Question): any {
+  if (q.type === "multi_choice") {
+    return q.options ?? []
+  }
+  return []
+}
 
 /* ===================================================
    Main component
@@ -167,7 +246,20 @@ export function SurveyList() {
       console.error("Error loading surveys:", error)
       setSurveys([])
     } else {
-      setSurveys(data as SurveyRow[])
+      const list = (data || []) as SurveyRow[]
+
+      const attritionRow: SurveyRow = {
+        id: ATTRITION_SURVEY_ID,
+        name: ATTRITION_SURVEY_NAME,
+        description: "Questions feeding the Attrition Risk Analytics model.",
+        audience: "all",
+        department: null,
+        employees: null,
+        due_date: null,
+        isAttrition: true,
+      }
+
+      setSurveys([...list, attritionRow])
     }
     setLoadingSurveys(false)
   }
@@ -217,10 +309,6 @@ export function SurveyList() {
       employees: a === "individuals" ? curr.employees : [],
     }))
   }
-
-  /* ===================================================
-     Create & publish
-  =================================================== */
 
   async function createAndPublish() {
     setLoadingCreate(true)
@@ -281,7 +369,41 @@ export function SurveyList() {
     loadingEditRef.current = true
     setSavingEdit(false)
     setEditSurveyId(sid)
+
     try {
+      if (sid === ATTRITION_SURVEY_ID) {
+        const { data, error } = await supabase
+          .from("attrition_survey_questions")
+          .select("id, feature_key, prompt, help_text, question_type, options, is_required, sort_order")
+          .order("sort_order", { ascending: true })
+
+        if (error) {
+          console.error("Failed to load attrition survey questions:", error)
+          alert("Failed to load Attrition Survey Demo questions.")
+          return
+        }
+
+        const questions: Question[] = (data || []).map((row: any) =>
+          mapAttritionRowToQuestion(row as AttritionQuestionRow),
+        )
+
+        const draftFromDb: SurveyDraft = {
+          id: ATTRITION_SURVEY_ID,
+          name: ATTRITION_SURVEY_NAME,
+          description: "Edit questions used by Attrition Risk Analytics. Answers go to attrition_survey_responses.",
+          audience: "all",
+          department: "",
+          employees: [],
+          dueDate: "",
+          status: "draft",
+          questions,
+        }
+
+        setEditDraft(draftFromDb)
+        setOpenEdit(true)
+        return
+      }
+
       const [{ data: sData, error: sErr }, { data: qData, error: qErr }] = await Promise.all([
         supabase.from("surveys").select("*").eq("id", sid).single(),
         supabase.from("survey_questions").select("id, question_type, prompt, options").eq("survey_id", sid).order("id"),
@@ -319,7 +441,52 @@ export function SurveyList() {
     if (!editSurveyId || !editDraft || savingEdit) return
     setSavingEdit(true)
     try {
-      // 1) update the survey row
+      if (editSurveyId === ATTRITION_SURVEY_ID) {
+        const qs = editDraft.questions
+
+        const existing = qs.filter(q => q.attritionId)
+        const added = qs.filter(q => !q.attritionId)
+
+        for (let idx = 0; idx < existing.length; idx++) {
+          const q = existing[idx]
+          const { error } = await supabase
+            .from("attrition_survey_questions")
+            .update({
+              prompt: q.prompt,
+              question_type: mapUiTypeToAttrition(q.type, q),
+              options: mapUiOptionsToAttrition(q),
+              sort_order: (idx + 1) * 10,
+            })
+            .eq("id", q.attritionId)
+          if (error) throw error
+        }
+
+        for (let idx = 0; idx < added.length; idx++) {
+          const q = added[idx]
+          const { error } = await supabase
+            .from("attrition_survey_questions")
+            .insert([
+              {
+                feature_key: q.featureKey || `custom_q_${Date.now()}_${idx}`,
+                prompt: q.prompt,
+                help_text: null,
+                question_type: mapUiTypeToAttrition(q.type, q),
+                options: mapUiOptionsToAttrition(q),
+                is_required: true,
+                sort_order: 1000 + (idx + 1) * 10,
+              },
+            ])
+          if (error) throw error
+        }
+
+        setOpenEdit(false)
+        setEditSurveyId(null)
+        setEditDraft(null)
+        return
+      }
+
+      if (!editSurveyId || !editDraft) return
+
       const { error: upErr } = await supabase
         .from("surveys")
         .update({
@@ -333,14 +500,12 @@ export function SurveyList() {
         .eq("id", editSurveyId)
       if (upErr) throw upErr
 
-      // 2) atomically replace questions in the DB (SECURITY DEFINER RPC)
       const payload = editDraft.questions.map(q => ({
         question_type: q.type,
         prompt: q.prompt,
         options: q.type === "multi_choice" ? (q.options ?? []) : null,
       }))
 
-      // Ensure it's a plain JSON array (avoids "scalar" issues in some envs)
       const { error: rpcErr } = await supabase.rpc("replace_survey_questions", {
         p_survey_id: editSurveyId,
         p_questions: JSON.parse(JSON.stringify(payload)),
@@ -360,6 +525,11 @@ export function SurveyList() {
   }
 
   async function deleteSurvey(sid: string) {
+    if (sid === ATTRITION_SURVEY_ID) {
+      alert("Attrition Survey Demo is managed by Maple HR and cannot be deleted.")
+      return
+    }
+
     if (!confirm("Delete this survey? This also deletes its questions and answers.")) return
 
     const { error } = await supabase.rpc("delete_survey_cascade", { p_survey_id: sid })
@@ -453,7 +623,7 @@ export function SurveyList() {
               Create survey
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create a new survey</DialogTitle>
               <DialogDescription>Define audience, due date, and add questions.</DialogDescription>
@@ -546,16 +716,25 @@ export function SurveyList() {
                 <TableBody>
                   {surveys.map((s) => (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {s.name}
+                        {s.isAttrition && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-700 border border-purple-100">
+                            Attrition
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="capitalize">{s.audience}</TableCell>
                       <TableCell>{s.due_date ?? "—"}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="sm" onClick={() => openEditSurvey(s.id)}>
                           <Pencil className="w-4 h-4 mr-1" /> Edit
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => deleteSurvey(s.id)}>
-                          <Trash2 className="w-4 h-4 mr-1" /> Delete
-                        </Button>
+                        {!s.isAttrition && (
+                          <Button variant="outline" size="sm" onClick={() => deleteSurvey(s.id)}>
+                            <Trash2 className="w-4 h-4 mr-1" /> Delete
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -599,7 +778,7 @@ export function SurveyList() {
 
       {/* Edit modal */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit survey</DialogTitle>
           </DialogHeader>
@@ -752,7 +931,7 @@ function SurveyEditor(props: {
                   <SelectContent>
                     <SelectItem value="short_text">Short text</SelectItem>
                     <SelectItem value="long_text">Long text</SelectItem>
-                    <SelectItem value="rating">Rating (1–5)</SelectItem>
+                    <SelectItem value="rating">Rating</SelectItem>
                     <SelectItem value="multi_choice">Multiple choice</SelectItem>
                   </SelectContent>
                 </Select>
