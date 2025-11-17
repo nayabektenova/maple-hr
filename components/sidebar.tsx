@@ -59,6 +59,7 @@ const navigation = [
   { name: "Manage Roles", href: "/admin/manageroles", icon: FileUser },
   { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
   { name: "HR Benefits", href: "/admin/benefits", icon: Sparkles },
+  { name: "Analytics", href: "/attrition-analytics", icon: Sparkles },
   //{ name: "PayStub", href: "/paystub", icon: DollarSign },
   //{ name: "Leaves", href: "/leaves", icon: Plane },
 
