@@ -37,6 +37,8 @@ const navigation = [
   { name: "Benefits", href: "/employeeview/benefits", icon: Sparkles },
   { name: "HR Benefits", href: "/admin/benefits", icon: Sparkles },
   { name: "Analytics", href: "/attrition-analytics", icon: Sparkles },
+  { name: "News Feed", href: "/employeeview/news", icon: MessageSquare }
+
 ]
 
 export function Sidebar() {
