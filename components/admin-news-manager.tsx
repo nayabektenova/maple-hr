@@ -26,6 +26,7 @@ export default function AdminNewsManager() {
   const [file, setFile] = useState<File | null>(null);
 
   const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadBranches();
@@ -40,7 +41,12 @@ export default function AdminNewsManager() {
   async function loadPosts() {
     const { data } = await supabase
       .from("news_posts")
-      .select("*")
+      .select(`
+        *,
+        branches (
+          name
+        )
+      `)
       .order("created_at", { ascending: false });
     setPosts(data ?? []);
   }
@@ -61,123 +67,212 @@ export default function AdminNewsManager() {
   }
 
   async function createPost() {
-    const imageUrl = await uploadImage();
-
-    const { error } = await supabase.from("news_posts").insert([
-      {
-        title,
-        body,
-        image_url: imageUrl,
-        branch_id: branchId === "all" ? null : branchId,
-      },
-    ]);
-
-    if (error) {
-      setNote("Post failed: " + error.message);
+    if (!title.trim() || !body.trim()) {
+      setNote("Please fill in both title and message");
       return;
     }
 
-    setNote("Post created!");
-    setTitle("");
-    setBody("");
-    setFile(null);
-    loadPosts();
+    setLoading(true);
+    setNote("");
+
+    try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setNote("You must be logged in to create posts");
+        return;
+      }
+
+      const imageUrl = await uploadImage();
+
+      const { error } = await supabase.from("news_posts").insert([
+        {
+          title: title.trim(),
+          body: body.trim(),
+          image_url: imageUrl,
+          branch_id: branchId === "all" ? null : branchId,
+          created_by: user.id
+        },
+      ]);
+
+      if (error) {
+        setNote("Post failed: " + error.message);
+        return;
+      }
+
+      setNote("Post created successfully!");
+      setTitle("");
+      setBody("");
+      setFile(null);
+      setBranchId(null);
+      
+      // Reset file input
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      
+      loadPosts();
+    } catch (error: any) {
+      setNote("Error: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function deletePost(id: string) {
-    const ok = confirm("Delete this post?");
+    const ok = confirm("Are you sure you want to delete this post?");
     if (!ok) return;
 
-    await supabase.from("news_posts").delete().eq("id", id);
+    const { error } = await supabase.from("news_posts").delete().eq("id", id);
+    
+    if (error) {
+      setNote("Delete failed: " + error.message);
+      return;
+    }
+
+    setNote("Post deleted successfully!");
     loadPosts();
   }
 
+  function getBranchName(post: any) {
+    if (!post.branch_id) return "All Branches";
+    return post.branches?.name || "Unknown Branch";
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <Card>
         <CardHeader>
           <CardTitle>Create News Post</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {note && <p className="text-blue-600 text-sm">{note}</p>}
+          {note && (
+            <div className={`p-3 rounded text-sm ${
+              note.includes("failed") || note.includes("Error") 
+                ? "bg-red-50 text-red-700 border border-red-200" 
+                : "bg-green-50 text-green-700 border border-green-200"
+            }`}>
+              {note}
+            </div>
+          )}
 
-          <Input
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Title</label>
+            <Input
+              placeholder="Enter post title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={loading}
+            />
+          </div>
 
-          <Textarea
-            placeholder="Message…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Message</label>
+            <Textarea
+              placeholder="Enter your message…"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={4}
+              disabled={loading}
+            />
+          </div>
 
-          <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Image (Optional)</label>
+            <Input 
+              type="file" 
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              disabled={loading}
+            />
+          </div>
 
-          <select
-            className="border rounded p-2"
-            onChange={(e) => setBranchId(e.target.value)}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Branch</label>
+            <select
+              className="w-full border rounded p-2 bg-white"
+              value={branchId || ""}
+              onChange={(e) => setBranchId(e.target.value || null)}
+              disabled={loading}
+            >
+              <option value="">Select branch</option>
+              <option value="all">All branches</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Button 
+            onClick={createPost} 
+            className="w-full" 
+            disabled={loading || !title.trim() || !body.trim()}
           >
-            <option value="">Select branch</option>
-            <option value="all">All branches</option>
-
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-
-          <Button onClick={createPost} className="w-full">
-            Post News
+            {loading ? "Creating Post..." : "Post News"}
           </Button>
         </CardContent>
       </Card>
 
-      {/* table */}
+      {/* Posts Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Manage Posts</CardTitle>
+          <CardTitle>Manage Posts ({posts.length})</CardTitle>
         </CardHeader>
 
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {posts.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>{p.title}</TableCell>
-                  <TableCell>
-                    {p.branch_id
-                      ? branches.find((b) => b.id === p.branch_id)?.name
-                      : "All"}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(p.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => deletePost(p.id)}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
+          {posts.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              No posts yet. Create your first news post above!
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+
+              <TableBody>
+                {posts.map((post) => (
+                  <TableRow key={post.id}>
+                    <TableCell className="font-medium">{post.title}</TableCell>
+                    <TableCell>{getBranchName(post)}</TableCell>
+                    <TableCell>
+                      {new Date(post.created_at).toLocaleDateString('en-CA', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      {post.image_url ? (
+                        <span className="text-green-600 text-sm">Yes</span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deletePost(post.id)}
+                        disabled={loading}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
