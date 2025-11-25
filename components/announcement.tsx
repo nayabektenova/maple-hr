@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { useRouter } from "next/navigation";
 
 // ---------- small helpers ----------
 const CustomSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
@@ -367,6 +368,8 @@ export function AnnouncementList() {
   const [alphaSort, setAlphaSort] = useState(false);
   const [pageStart, setPageStart] = useState<Date>(() => new Date());
 
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -659,7 +662,13 @@ export function AnnouncementList() {
             </label>
           </div>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex flex-col gap-2">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => router.push("/training-module")} 
+            >
+              Access Training
+            </Button>
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={() => setModalOpen(true)}
@@ -686,9 +695,11 @@ export function AnnouncementList() {
 
           <TableBody>
             {filtered.map((ann) => (
-              <TableRow 
-                key={ann.id} 
-                className={`hover:bg-gray-50 ${!ann.isRead ? 'bg-blue-50/30' : ''}`}
+              <TableRow
+                key={ann.id}
+                className={`hover:bg-gray-50 ${
+                  !ann.isRead ? "bg-blue-50/30" : ""
+                }`}
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -714,7 +725,7 @@ export function AnnouncementList() {
                         }`}
                       />
                     </Button>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -729,7 +740,9 @@ export function AnnouncementList() {
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Mark Read
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => viewAnnouncement(ann.id)}>
+                        <DropdownMenuItem
+                          onClick={() => viewAnnouncement(ann.id)}
+                        >
                           <Eye className="w-4 h-4 mr-2" />
                           View
                         </DropdownMenuItem>
