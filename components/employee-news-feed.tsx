@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart } from "lucide-react";
-import { toast } from "sonner"; // optional, remove if you don't use sonner
+import { Input } from "@/components/ui/input";
+import { Heart, Search } from "lucide-react";
+import { toast } from "sonner";
 
 export default function EmployeeNewsPage() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -14,6 +15,9 @@ export default function EmployeeNewsPage() {
   const [userFavorites, setUserFavorites] = useState<Set<string>>(new Set());
   const [isToggling, setIsToggling] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"all" | "favorites">("all");
+  
+  // ←←← NEW: Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   const currentUser = supabase.auth.getUser();
 
@@ -22,17 +26,11 @@ export default function EmployeeNewsPage() {
     loadUserFavorites();
   }, [selectedBranch]);
 
-  // Load all posts
   async function loadPosts() {
     setLoading(true);
-
     let query = supabase
       .from("news_posts")
-      .select(`
-        *,
-        branches (name),
-        favorites_count
-      `)
+      .select(`*, branches (name), favorites_count`)
       .order("created_at", { ascending: false });
 
     if (selectedBranch !== "all") {
@@ -40,9 +38,8 @@ export default function EmployeeNewsPage() {
     }
 
     const { data, error } = await query;
-
     if (error) {
-      console.error("Error loading posts:", error);
+      console.error(error);
       toast.error("Failed to load news");
     } else {
       setPosts(data || []);
@@ -50,7 +47,6 @@ export default function EmployeeNewsPage() {
     setLoading(false);
   }
 
-  // Load which posts current user has favorited
   async function loadUserFavorites() {
     const { data: userData } = await currentUser;
     if (!userData?.user) return;
@@ -60,17 +56,14 @@ export default function EmployeeNewsPage() {
       .select("post_id")
       .eq("user_id", userData.user.id);
 
-    const favoriteIds = new Set(data?.map((f) => f.post_id) || []);
-    setUserFavorites(favoriteIds);
+    setUserFavorites(new Set(data?.map((f) => f.post_id) || []));
   }
 
-  // Toggle favorite
   async function toggleFavorite(postId: string, currentCount: number) {
     setIsToggling(postId);
-
     const { data: userData } = await currentUser;
     if (!userData?.user) {
-      toast.error("You must be logged in to favorite posts");
+      toast.error("Log in to favorite posts");
       setIsToggling(null);
       return;
     }
@@ -78,41 +71,16 @@ export default function EmployeeNewsPage() {
     const isFavorited = userFavorites.has(postId);
 
     if (isFavorited) {
-      const { error } = await supabase
-        .from("post_favorites")
-        .delete()
-        .eq("user_id", userData.user.id)
-        .eq("post_id", postId);
-
-      if (!error) {
-        setUserFavorites((prev) => {
-          const next = new Set(prev);
-          next.delete(postId);
-          return next;
-        });
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId ? { ...p, favorites_count: currentCount - 1 } : p
-          )
-        );
-        toast.success("Removed from favorites");
-      }
+      await supabase.from("post_favorites").delete().eq("user_id", userData.user.id).eq("post_id", postId);
+      setUserFavorites((prev) => { const n = new Set(prev); n.delete(postId); return n; });
+      setPosts((p) => p.map((x) => x.id === postId ? { ...x, favorites_count: currentCount - 1 } : x));
+      toast.success("Removed from favorites");
     } else {
-      const { error } = await supabase
-        .from("post_favorites")
-        .insert({ user_id: userData.user.id, post_id: postId });
-
-      if (!error) {
-        setUserFavorites((prev) => new Set(prev).add(postId));
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId ? { ...p, favorites_count: currentCount + 1 } : p
-          )
-        );
-        toast.success("Added to favorites!");
-      }
+      await supabase.from("post_favorites").insert({ user_id: userData.user.id, post_id: postId });
+      setUserFavorites((prev) => new Set(prev).add(postId));
+      setPosts((p) => p.map((x) => x.id === postId ? { ...x, favorites_count: currentCount + 1 } : x));
+      toast.success("Added to favorites ❤️");
     }
-
     setIsToggling(null);
   }
 
@@ -131,11 +99,27 @@ export default function EmployeeNewsPage() {
     });
   }
 
-  // Determine which posts to show
-  const displayedPosts =
-    viewMode === "favorites"
-      ? posts.filter((p) => userFavorites.has(p.id))
-      : posts;
+  // ←←← SEARCH + FILTER LOGIC (instant, no extra requests)
+  const displayedPosts = useMemo(() => {
+    let filtered = posts;
+
+    // View mode filter
+    if (viewMode === "favorites") {
+      filtered = filtered.filter((p) => userFavorites.has(p.id));
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.title?.toLowerCase().includes(q) ||
+          p.body?.toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [posts, viewMode, userFavorites, searchQuery]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto py-8">
@@ -150,30 +134,39 @@ export default function EmployeeNewsPage() {
         </CardHeader>
 
         <CardContent>
+          {/* Search Bar */}
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search announcements..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 text-base"
+            />
+          </div>
+
           {/* Branch Filter */}
           <div className="mb-6">
             <label className="text-sm font-medium mb-2 block">Filter by Branch:</label>
             <select
-              className="border rounded-lg px-3 py-2 bg-white text-sm"
+              className="border rounded-lg px-3 py-2 bg-white text-sm w-full max-w-xs"
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
               disabled={loading}
             >
               <option value="all">All News</option>
               <option value="null">Global Announcements</option>
-              {/* Add more branches dynamically if you fetch them */}
             </select>
           </div>
 
-          {/* All / Favorites Toggle */}
+          {/* All / Favorites Tabs */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setViewMode("all")}
                 className={`px-5 py-2 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "all"
-                    ? "bg-white shadow-sm text-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
+                  viewMode === "all" ? "bg-white shadow-sm text-gray-900" : "text-gray-600"
                 }`}
               >
                 All News
@@ -181,9 +174,7 @@ export default function EmployeeNewsPage() {
               <button
                 onClick={() => setViewMode("favorites")}
                 className={`px-5 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-                  viewMode === "favorites"
-                    ? "bg-white shadow-sm text-gray-900"
-                    : "text-gray-600 hover:text-gray-900"
+                  viewMode === "favorites" ? "bg-white shadow-sm text-gray-900" : "text-gray-600"
                 }`}
               >
                 <Heart className={`w-4 h-4 ${viewMode === "favorites" ? "fill-red-500 text-red-500" : ""}`} />
@@ -195,16 +186,23 @@ export default function EmployeeNewsPage() {
                 )}
               </button>
             </div>
+
+            {/* Live result count */}
+            <div className="text-sm text-gray-500">
+              {displayedPosts.length} {displayedPosts.length === 1 ? "post" : "posts"}
+            </div>
           </div>
 
-          {/* Loading / Empty / Posts */}
+          {/* Loading / Empty / List */}
           {loading ? (
-            <div className="text-center py-12 text-gray-500">Loading news...</div>
+            <div className="text-center py-12 text-gray-500">Loading...</div>
           ) : displayedPosts.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              {viewMode === "favorites"
-                ? "You haven't favorited any posts yet."
-                : "No news announcements yet."}
+              {searchQuery
+                ? `No posts found for "${searchQuery}"`
+                : viewMode === "favorites"
+                ? "You haven't favorited anything yet."
+                : "No announcements yet."}
             </div>
           ) : (
             <div className="space-y-6">
