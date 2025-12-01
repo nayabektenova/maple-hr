@@ -22,6 +22,8 @@ import {
   Tooltip,
 } from "recharts"
 
+import { useEffect, useState } from "react";
+
 const stats = [
   { title: "Total Employees", value: "247", change: "+12%", changeType: "positive" as const, icon: Users },
   { title: "New Hires", value: "23", change: "+8%", changeType: "positive" as const, icon: UserPlus },
