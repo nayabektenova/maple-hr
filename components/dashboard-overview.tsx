@@ -35,7 +35,40 @@ const upcomingEvents = [
   { id: 3, title: "Holiday Party",        date: "Dec 22, 2024", time: "6:00 PM",  attendees: 180 },
 ]
 
+type StatChangeType = "positive" | "negative";
+
+type HeadcountByDepartment = {
+  department: string;
+  headcount: number;
+};
+
+type EmployeeSummary = {
+  totalEmployees: number;
+  newHiresThisMonth: number;
+  headcountByDepartment: HeadcountByDepartment[];
+};
+
 export function DashboardOverview() {
+  const [summary, setSummary] = useState<EmployeeSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch("/api/employees/summary");
+        if (!res.ok) throw new Error("Failed to load employee summary");
+        const data: EmployeeSummary = await res.json();
+        setSummary(data);
+      } catch (err: any) {
+        setError(err.message ?? "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, []);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
