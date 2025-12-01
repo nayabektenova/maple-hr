@@ -11,21 +11,17 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Maple HR Attrition API")
 
-# ----------------- CORS (dev: allow all) -----------------
+# CORS (dev: allow all)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # TODO: restrict in production
+    allow_origins=["*"],     
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----------------- Load model -----------------
-
-# This file is at: <project_root>/attrition_api/main.py
-# Model is at:     <project_root>/attrition_model.joblib
-BASE_DIR = Path(__file__).resolve().parents[1]  # -> maple-hr/
+BASE_DIR = Path(__file__).resolve().parents[1]  
 MODEL_PATH = BASE_DIR / "attrition_model.joblib"
 
 try:
@@ -35,7 +31,7 @@ except Exception as e:
     raise RuntimeError(f"Failed to load model from {MODEL_PATH}: {e}")
 
 
-# ----------------- Schemas -----------------
+# Schemas 
 
 class EmployeeFeatures(BaseModel):
     Age: int
@@ -52,10 +48,10 @@ class EmployeeFeatures(BaseModel):
     WorkLifeBalance: int          # 1–4
     RelationshipSatisfaction: int # 1–4
     JobInvolvement: int           # 1–4
-    Department: str               # e.g. "Sales"
-    JobRole: str                  # e.g. "Sales Executive"
-    BusinessTravel: str           # e.g. "Travel_Rarely"
-    MaritalStatus: str            # e.g. "Single"
+    Department: str               # "Sales"
+    JobRole: str                  # "Sales Executive"
+    BusinessTravel: str           # "Travel_Rarely"
+    MaritalStatus: str            # "Single"
     OverTime: str                 # "Yes" or "No"
     Gender: str                   # "Male"/"Female"
 
@@ -66,7 +62,7 @@ class PredictionResponse(BaseModel):
     reasons: List[str]
 
 
-# ----------------- Explanation helper -----------------
+# Explanation helper
 
 def build_reasons(row: pd.Series) -> List[str]:
     """Very simple rule-based explanations based on input features."""
@@ -88,7 +84,7 @@ def build_reasons(row: pd.Series) -> List[str]:
     return reasons[:3] or ["No major risk factors detected"]
 
 
-# ----------------- Routes -----------------
+# Routes
 
 @app.get("/health")
 def health():
