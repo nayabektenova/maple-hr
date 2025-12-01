@@ -62,6 +62,12 @@ const buildStats = (summary: EmployeeSummary | null) => {
 
 const stats = buildStats(summary);
 
+const { data, error } = await supabase
+  .from("employees")
+  .select("*")
+  .eq("is_active", true);
+
+
 type StatChangeType = "positive" | "negative";
 
 type HeadcountByDepartment = {
