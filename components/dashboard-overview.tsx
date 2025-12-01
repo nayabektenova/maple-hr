@@ -24,6 +24,25 @@ import {
 
 import { useEffect, useState } from "react";
 
+import { buildSummary } from "@/app/api/employees/summary/utils";
+import sample from "./fixtures/employees.json";
+
+test("computes total employees", () => {
+  const summary = buildSummary(sample);
+  expect(summary.totalEmployees).toBe(sample.length);
+});
+
+test("computes headcount by department", () => {
+  const summary = buildSummary(sample);
+  const dev = summary.headcountByDepartment.find(
+    (d) => d.department === "Development"
+  );
+  expect(dev?.headcount).toBe(
+    sample.filter((e) => e.department === "Development").length
+  );
+});
+
+
 const buildStats = (summary: EmployeeSummary | null) => {
   const totalEmployees = summary?.totalEmployees ?? 0;
   const newHires = summary?.newHiresThisMonth ?? 0;
