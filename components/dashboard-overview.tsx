@@ -24,18 +24,42 @@ import {
 
 import { useEffect, useState } from "react";
 
-const stats = [
-  { title: "Total Employees", value: "247", change: "+12%", changeType: "positive" as const, icon: Users },
-  { title: "New Hires", value: "23", change: "+8%", changeType: "positive" as const, icon: UserPlus },
-  { title: "Pending Leaves", value: "8",  change: "-2%", changeType: "negative" as const, icon: Calendar  },
-  { title: "Monthly Payroll", value: "$847K", change: "+5%", changeType: "positive" as const, icon: DollarSign },
-]
+const buildStats = (summary: EmployeeSummary | null) => {
+  const totalEmployees = summary?.totalEmployees ?? 0;
+  const newHires = summary?.newHiresThisMonth ?? 0;
 
-const upcomingEvents = [
-  { id: 1, title: "Team Building Event",  date: "Dec 15, 2024", time: "2:00 PM",  attendees: 45  },
-  { id: 2, title: "Monthly All-Hands",   date: "Dec 20, 2024", time: "10:00 AM", attendees: 247 },
-  { id: 3, title: "Holiday Party",        date: "Dec 22, 2024", time: "6:00 PM",  attendees: 180 },
-]
+  return [
+    {
+      title: "Total Employees",
+      value: loading ? "…" : totalEmployees.toString(),
+      change: "+12%", // can adjust later if you compute real change
+      changeType: "positive" as StatChangeType,
+      icon: Users,
+    },
+    {
+      title: "New Hires (this month)",
+      value: loading ? "…" : newHires.toString(),
+      change: "+8%",
+      changeType: "positive" as StatChangeType,
+      icon: UserPlus,
+    },
+    {
+      title: "Pending Leaves",
+      value: "8", // still mock for now
+      change: "-2%",
+      changeType: "negative" as StatChangeType,
+      icon: Calendar,
+    },
+    {
+      title: "Monthly Payroll",
+      value: "$847K", // still mock
+      change: "+5%",
+      changeType: "positive" as StatChangeType,
+      icon: DollarSign,
+    },
+  ];
+};
+
 
 type StatChangeType = "positive" | "negative";
 
