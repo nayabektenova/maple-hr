@@ -156,16 +156,11 @@ export function DashboardOverview() {
             <CardContent className="h-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={[
-                    { department: "Development",      headcount: 102 },
-                    { department: "Marketing",        headcount: 56 },
-                    { department: "Finance",          headcount: 35 },
-                    { department: "Administration",   headcount: 28 },
-                    { department: "Cybersecurity",    headcount: 12 },
-                    { department: "HR",               headcount: 18 },
-                    { department: "Legal",            headcount: 9  },
-                    { department: "Support",          headcount: 22 },
-                  ]}
+                  data={
+                    summary?.headcountByDepartment ?? [
+                      // optional tiny fallback if you want
+                    ]
+                  }
                   margin={{ top: 10, right: 20, left: 0, bottom: 40 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
