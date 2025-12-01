@@ -25,7 +25,7 @@ const sampleEmployeeData = {
   passportNumber: "12345678",
   dateOfBirth: "1994-02-01",
   placeOfBirth: "UK",
-  materialStatus: "Single",
+  maritalStatus: "Single",
   emergencyContact: "+1 234 56789",
   nationality: "UK",
   position: "Manager",
@@ -48,7 +48,7 @@ export function EditEmployeeForm({ employeeId }: EditEmployeeFormProps) {
     passportNumber: "",
     dateOfBirth: "",
     placeOfBirth: "",
-    materialStatus: "",
+    maritalStatus: "",
     emergencyContact: "",
     nationality: "",
     position: "",
@@ -186,13 +186,13 @@ export function EditEmployeeForm({ employeeId }: EditEmployeeFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="materialStatus" className="text-sm font-medium">
-                    Material status
+                  <Label htmlFor="maritalStatus" className="text-sm font-medium">
+                    Marital status
                   </Label>
                   <Input
-                    id="materialStatus"
-                    value={formData.materialStatus}
-                    onChange={(e) => handleInputChange("materialStatus", e.target.value)}
+                    id="maritalStatus"
+                    value={formData.maritalStatus}
+                    onChange={(e) => handleInputChange("maritalStatus", e.target.value)}
                     className="w-full"
                   />
                 </div>

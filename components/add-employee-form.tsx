@@ -21,7 +21,7 @@ export function AddEmployeeForm() {
     passportNumber: "",
     dateOfBirth: "",
     nationality: "",
-    materialStatus: "",
+    maritalStatus: "",
     emergencyContact: "",
     emergencyContact2: "",
     position: "",
@@ -151,13 +151,13 @@ export function AddEmployeeForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="materialStatus" className="text-sm font-medium">
-                  Material status
+                <Label htmlFor="maritalStatus" className="text-sm font-medium">
+                  Marital status
                 </Label>
                 <Input
-                  id="materialStatus"
-                  value={formData.materialStatus}
-                  onChange={(e) => handleInputChange("materialStatus", e.target.value)}
+                  id="maritalStatus"
+                  value={formData.maritalStatus}
+                  onChange={(e) => handleInputChange("maritalStatus", e.target.value)}
                   className="w-full"
                 />
               </div>

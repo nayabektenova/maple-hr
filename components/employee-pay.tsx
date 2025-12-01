@@ -1,212 +1,311 @@
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { calcPayroll } from "@/lib/payrollCalc";
+import { supabase } from "@/lib/supabaseClient";
 
-type Paystub = {
-  id: string;
-  periodStart: string; // YYYY-MM-DD
-  periodEnd: string;   // YYYY-MM-DD
-  payDate: string;     // YYYY-MM-DD
-  gross: number;
-  deductions: number;
+type CalcResult = {
+  grossPay: number;
+  cpp: number;
+  ei: number;
+  federalTax: number;
   net: number;
 };
 
-type DirectDeposit = {
-  accountHolder: string;
-  bankName: string;
-  transitNumber: string;     // 5 digits in CA
-  institutionNumber: string; // 3 digits in CA
-  accountNumber: string;     // varies
-};
-
-const STUBS_KEY = "maplehr_paystubs_v1";
-const DIRECT_KEY = "maplehr_direct_deposit_v1";
-
-const uid = () => crypto?.randomUUID?.() ?? `id_${Math.random().toString(36).slice(2)}`;
-const cad = (n: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(n);
-const fmtDate = (d: string) => {
-  const dt = new Date(d);
-  return isNaN(dt.getTime()) ? d : dt.toLocaleDateString();
-};
-
-function loadStubs(): Paystub[] {
-  try {
-    const raw = localStorage.getItem(STUBS_KEY);
-    return raw ? (JSON.parse(raw) as Paystub[]) : [];
-  } catch {
-    return [];
-  }
-}
-function saveStubs(rows: Paystub[]) {
-  localStorage.setItem(STUBS_KEY, JSON.stringify(rows));
-}
-function seedStubs() {
-  const demo: Paystub[] = [
-    { id: uid(), periodStart: "2025-08-16", periodEnd: "2025-08-31", payDate: "2025-09-05", gross: 3200, deductions: 640, net: 2560 },
-    { id: uid(), periodStart: "2025-08-01", periodEnd: "2025-08-15", payDate: "2025-08-20", gross: 3200, deductions: 620, net: 2580 },
-    { id: uid(), periodStart: "2025-07-16", periodEnd: "2025-07-31", payDate: "2025-08-05", gross: 3200, deductions: 630, net: 2570 },
-    { id: uid(), periodStart: "2025-07-01", periodEnd: "2025-07-15", payDate: "2025-07-20", gross: 3200, deductions: 615, net: 2585 },
-  ];
-  saveStubs(demo);
-}
-
-function loadDirect(): DirectDeposit | null {
-  try {
-    const raw = localStorage.getItem(DIRECT_KEY);
-    return raw ? (JSON.parse(raw) as DirectDeposit) : null;
-  } catch {
-    return null;
-  }
-}
-function saveDirect(data: DirectDeposit) {
-  localStorage.setItem(DIRECT_KEY, JSON.stringify(data));
-}
-
-export default function EmployeePay() {
-  const [stubs, setStubs] = React.useState<Paystub[]>([]);
-  const [form, setForm] = React.useState<DirectDeposit>({
-    accountHolder: "",
-    bankName: "",
-    transitNumber: "",
-    institutionNumber: "",
-    accountNumber: "",
-  });
-  const [notice, setNotice] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    const s = loadStubs();
-    if (!s.length) seedStubs();
-    setStubs(loadStubs());
-
-    const d = loadDirect();
-    if (d) setForm(d);
-  }, []);
-
-  const onChange = (key: keyof DirectDeposit) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [key]: e.target.value }));
-  };
-
-  const save = () => {
-    // Basic trim-only “validation” to keep it simple
-    const next: DirectDeposit = {
-      accountHolder: form.accountHolder.trim(),
-      bankName: form.bankName.trim(),
-      transitNumber: form.transitNumber.trim(),
-      institutionNumber: form.institutionNumber.trim(),
-      accountNumber: form.accountNumber.trim(),
-    };
-    saveDirect(next);
-    setNotice("Direct deposit info saved (local only).");
-    setTimeout(() => setNotice(null), 2500);
-  };
-
-  const resetDemo = () => {
-    seedStubs();
-    setStubs(loadStubs());
-    setNotice("Demo paycheques reset.");
-    setTimeout(() => setNotice(null), 2000);
-  };
-
-  // Sort newest first by pay date
-  const rows = React.useMemo(
-    () => stubs.slice().sort((a, b) => +new Date(b.payDate) - +new Date(a.payDate)),
-    [stubs]
+function Field(props: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+  min?: string;
+  step?: string;
+}) {
+  const { label, ...inputProps } = props;
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <Input {...inputProps} />
+    </div>
   );
+}
+
+function Row({
+  label,
+  children,
+  bold,
+}: {
+  label: string;
+  children: React.ReactNode;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-600">{label}</span>
+      <span className={bold ? "font-semibold text-gray-900" : ""}>
+        {children ?? "—"}
+      </span>
+    </div>
+  );
+}
+
+export default function PayrollCalculatorPage() {
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+
+  const [hoursWorked, setHoursWorked] = useState<string>("");
+  const [hourlyRate, setHourlyRate] = useState<string>("");
+
+  // pay frequency selector (default biweekly = 26)
+  const [periodsPerYear, setPeriodsPerYear] = useState<number>(26);
+
+  // YTD placeholders (you can replace these with values pulled from Supabase per employee)
+  const [cppYTD] = useState<number>(0);
+  const [eiYTD] = useState<number>(0);
+
+  const [result, setResult] = useState<CalcResult | null>(null);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function sanitizePositiveFloat(v: string) {
+    const num = parseFloat(v);
+    if (Number.isNaN(num) || num < 0) return 0;
+    return num;
+  }
+
+  function handleCalculate() {
+    const h = sanitizePositiveFloat(hoursWorked);
+    const r = sanitizePositiveFloat(hourlyRate);
+
+    const payroll = calcPayroll({
+      hoursWorked: h,
+      hourlyRate: r,
+      periodsPerYear,
+      cppDeductedYTD: cppYTD,
+      eiDeductedYTD: eiYTD,
+    });
+
+    setResult(payroll);
+    setSavedNotice(null);
+  }
+
+  async function handleSave() {
+    if (!result) return;
+
+    setSaving(true);
+    setSavedNotice(null);
+
+    try {
+      const hoursNum = parseFloat(hoursWorked) || 0;
+      const rateNum = parseFloat(hourlyRate) || 0;
+
+      // Ensure your Supabase table has these columns:
+      // employee_id (text), employee_name (text),
+      // hours_worked (numeric), hourly_rate (numeric),
+      // periods_per_year (int),
+      // gross_pay (numeric), cpp (numeric), ei (numeric),
+      // federal_tax (numeric), net_pay (numeric),
+      // created_at (timestamptz)
+      const { error } = await supabase.from("payroll_records").insert([
+        {
+          employee_id: employeeId || null,
+          employee_name: employeeName || null,
+
+          hours_worked: hoursNum,
+          hourly_rate: rateNum,
+          periods_per_year: periodsPerYear,
+
+          gross_pay: result.grossPay,
+          cpp: result.cpp,
+          ei: result.ei,
+          federal_tax: result.federalTax,
+          net_pay: result.net,
+
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        throw error;
+      }
+
+      setSavedNotice("Saved to payroll.");
+    } catch (e: any) {
+      setSavedNotice(`Failed to save: ${e?.message || "unknown error"}`);
+    } finally {
+        setSaving(false);
+    }
+  }
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      {/* Left: Pay history */}
-      <Card className="md:col-span-2">
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle className="text-base">Paycheque History</CardTitle>
-          <Button variant="outline" size="sm" onClick={resetDemo}>Reset demo data</Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pay Date</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Gross</TableHead>
-                <TableHead>Deductions</TableHead>
-                <TableHead>Net</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((p) => (
-                <TableRow key={p.id} className="hover:bg-gray-50">
-                  <TableCell>{fmtDate(p.payDate)}</TableCell>
-                  <TableCell>{fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}</TableCell>
-                  <TableCell>{cad(p.gross)}</TableCell>
-                  <TableCell>{cad(p.deductions)}</TableCell>
-                  <TableCell className="font-medium">{cad(p.net)}</TableCell>
-                </TableRow>
-              ))}
-              {rows.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    No paycheques found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Right: Direct deposit */}
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Update Direct Deposit Information</CardTitle>
+          <CardTitle className="text-xl font-semibold">
+            Payroll Calculator
+          </CardTitle>
+          <p className="text-sm text-gray-500">
+            Enter employee info and pay for this period. We'll estimate CPP, EI,
+            and federal tax using CRA-style per-period rules and show take-home.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {notice && (
-            <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">{notice}</div>
-          )}
 
-          <div className="grid gap-2">
-            <label className="text-sm">Account holder</label>
-            <Input value={form.accountHolder} onChange={onChange("accountHolder")} placeholder="Full name on account" />
-          </div>
+        <CardContent className="space-y-6">
+          {/* Employee info */}
+          <section className="grid md:grid-cols-2 gap-4">
+            <Field
+              label="Employee Name"
+              value={employeeName}
+              onChange={(e) => setEmployeeName(e.target.value)}
+              placeholder="Jane Doe"
+            />
 
-          <div className="grid gap-2">
-            <label className="text-sm">Bank name</label>
-            <Input value={form.bankName} onChange={onChange("bankName")} placeholder="e.g., RBC, TD, Scotiabank" />
-          </div>
+            <Field
+              label="Employee ID / Number"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              placeholder="E-1024"
+            />
+          </section>
 
-          <div className="grid gap-2">
-            <label className="text-sm">Transit number (5 digits)</label>
-            <Input value={form.transitNumber} onChange={onChange("transitNumber")} placeholder="12345" />
-          </div>
+          <Separator />
 
-          <div className="grid gap-2">
-            <label className="text-sm">Institution number (3 digits)</label>
-            <Input value={form.institutionNumber} onChange={onChange("institutionNumber")} placeholder="003" />
-          </div>
+          {/* Pay input */}
+          <section className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Field
+              label="Hours Worked (this period)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={hoursWorked}
+              onChange={(e) => setHoursWorked(e.target.value)}
+              placeholder="80"
+            />
 
-          <div className="grid gap-2">
-            <label className="text-sm">Account number</label>
-            <Input value={form.accountNumber} onChange={onChange("accountNumber")} placeholder="xxxxxxxxx" />
+            <Field
+              label="Hourly Rate ($/hr)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+              placeholder="20.00"
+            />
+
+            {/* Pay frequency select */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Pay Frequency
+              </label>
+              <select
+                className="border rounded px-2 py-2 text-sm w-full"
+                value={periodsPerYear}
+                onChange={(e) => setPeriodsPerYear(Number(e.target.value))}
+              >
+                <option value={52}>Weekly (52)</option>
+                <option value={26}>Biweekly (26)</option>
+                <option value={24}>Semi-monthly (24)</option>
+                <option value={12}>Monthly (12)</option>
+              </select>
+            </div>
+          </section>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              type="button"
+              onClick={handleCalculate}
+              disabled={!hoursWorked || !hourlyRate}
+            >
+              Calculate
+            </Button>
+
+            <Button
+              variant="outline"
+              type="button"
+              disabled={!result || saving}
+              onClick={handleSave}
+            >
+              {saving ? "Saving..." : "Save to Payroll"}
+            </Button>
+
+            {savedNotice && (
+              <span className="text-sm text-gray-500">{savedNotice}</span>
+            )}
           </div>
 
           <Separator />
 
-          <div className="flex gap-2">
-            <Button className="bg-green-600 hover:bg-green-700" onClick={save}>Save</Button>
-            <Button variant="outline" onClick={() => setForm(loadDirect() ?? {
-              accountHolder: "", bankName: "", transitNumber: "", institutionNumber: "", accountNumber: ""
-            })}>
-              Revert
-            </Button>
-          </div>
+          <section className="grid md:grid-cols-2 gap-6">
+            {/* Results card */}
+            <Card className="border border-gray-200 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-gray-800">
+                  Calculated Results
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-gray-700">
+                <Row label="Gross Pay">{money(result?.grossPay)}</Row>
+
+                <Row label="CPP Deduction">{money(result?.cpp)}</Row>
+                <Row label="EI Deduction">{money(result?.ei)}</Row>
+                <Row label="Federal Tax Deduction">
+                  {money(result?.federalTax)}
+                </Row>
+
+                <Separator className="my-2" />
+
+                <Row label="Net Pay (Take Home)" bold>
+                  {money(result?.net)}
+                </Row>
+              </CardContent>
+            </Card>
+
+            {/* Summary card */}
+            <Card className="border border-gray-200 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base font-medium text-gray-800">
+                  Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-gray-700">
+                <Row label="Employee">{employeeName || "—"}</Row>
+                <Row label="Employee ID">{employeeId || "—"}</Row>
+                <Row label="Hours">{hoursWorked || "—"}</Row>
+                <Row label="Rate ($/hr)">{hourlyRate || "—"}</Row>
+                <Row label="Pay Frequency">
+                  {freqLabel(periodsPerYear)}
+                </Row>
+              </CardContent>
+            </Card>
+          </section>
         </CardContent>
       </Card>
     </div>
   );
+
+  function money(n: number | undefined) {
+    if (n === undefined || Number.isNaN(n)) return "—";
+    return `$${n.toFixed(2)}`;
+  }
+
+  function freqLabel(p: number) {
+    switch (p) {
+      case 52:
+        return "Weekly (52)";
+      case 26:
+        return "Biweekly (26)";
+      case 24:
+        return "Semi-monthly (24)";
+      case 12:
+        return "Monthly (12)";
+      default:
+        return `${p} / year`;
+    }
+  }
 }

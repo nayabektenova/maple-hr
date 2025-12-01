@@ -1,213 +1,230 @@
 "use client";
 
 import * as React from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import {
+  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
+} from "@/components/ui/table";
 
-type TimeOffType = "Vacation" | "Sick" | "Personal" | "Unpaid" | "Other";
-type Status = "pending" | "approved" | "declined";
-
-type TimeOffRequest = {
+type Row = {
   id: string;
-  submittedAt: string; // ISO
-  type: TimeOffType;
-  startDate: string;   // YYYY-MM-DD
-  endDate: string;     // YYYY-MM-DD
-  reason?: string;
-  status: Status;      // will be "pending" in this FE-only demo
+  type: "Leave";
+  user_id: string;
+  employee_name: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+  status: "pending" | "approved" | "declined";
+  created_at: string;
+  processed_at: string | null;
+  decline_reason: string | null;
 };
 
-const KEY = "maplehr_time_off_requests_v1";
-const uid = () => crypto?.randomUUID?.() ?? `id_${Math.random().toString(36).slice(2)}`;
-const fmt = (d: string) => {
-  const t = new Date(d);
-  return isNaN(t.getTime()) ? d : t.toLocaleDateString();
-};
-const dayCount = (start: string, end: string) => {
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
-  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
-  const ms = e.getTime() - s.getTime();
-  return ms < 0 ? 0 : Math.floor(ms / 86400000) + 1; // inclusive
-};
-
-function load(): TimeOffRequest[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const arr = raw ? (JSON.parse(raw) as TimeOffRequest[]) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-function save(rows: TimeOffRequest[]) {
-  localStorage.setItem(KEY, JSON.stringify(rows));
+function fmtDate(d?: string | null) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  return Number.isNaN(dt.getTime()) ? d : dt.toLocaleString();
 }
 
 export default function TimeOff() {
-  const [rows, setRows] = React.useState<TimeOffRequest[]>([]);
-  const [type, setType] = React.useState<TimeOffType | "">("");
-  const [startDate, setStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = React.useState(() => new Date().toISOString().slice(0, 10));
-  const [reason, setReason] = React.useState("");
-  const [notice, setNotice] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [uid, setUid] = React.useState<string | null>(null);
+  const [displayName, setDisplayName] = React.useState<string | null>(null);
 
+  // form
+  const [start, setStart] = React.useState("");
+  const [end, setEnd] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+
+  // list
+  const [rows, setRows] = React.useState<Row[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
+
+  // Resolve user once on mount
   React.useEffect(() => {
-    setRows(load());
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+      const newUid = user?.id ?? null;
+      setUid(newUid);
+
+      if (newUid) {
+        // optional display name
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", newUid)
+          .maybeSingle();
+        setDisplayName((prof as any)?.full_name ?? null);
+
+        await load(newUid);
+      }
+    })();
   }, []);
 
-  const list = React.useMemo(
-    () => rows.slice().sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt)),
-    [rows]
-  );
-
-  function clearForm() {
-    setType("");
-    const today = new Date().toISOString().slice(0, 10);
-    setStartDate(today);
-    setEndDate(today);
-    setReason("");
+  async function load(userId: string) {
+    setLoading(true);
     setError(null);
+    try {
+      const { data, error } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("type", "Leave")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setRows((data as Row[]) ?? []);
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load time off requests.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function submit() {
+  async function refresh() {
+    setSuccess(null);
     setError(null);
-    if (!type) return setError("Please choose a time off type.");
-    if (!startDate || !endDate) return setError("Please select start and end dates.");
-    if (new Date(startDate) > new Date(endDate)) return setError("Start date cannot be after end date.");
-
-    const next: TimeOffRequest = {
-      id: uid(),
-      submittedAt: new Date().toISOString(),
-      type: type as TimeOffType,
-      startDate,
-      endDate,
-      reason: reason.trim() || undefined,
-      status: "pending",
-    };
-
-    setRows((prev) => {
-      const arr = [next, ...prev];
-      save(arr);
-      return arr;
-    });
-    clearForm();
-    setNotice("Time off request submitted (local only).");
-    setTimeout(() => setNotice(null), 2500);
+    // Re-resolve the current user so Refresh works even if uid was null
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id ?? null;
+    setUid(userId);
+    if (!userId) {
+      setError("You are not signed in.");
+      return;
+    }
+    await load(userId);
   }
 
-  function cancel(id: string) {
-    setRows((prev) => {
-      const arr = prev.filter((r) => r.id !== id);
-      save(arr);
-      return arr;
-    });
+  async function submit() {
+    if (!uid) {
+      setError("You are not signed in.");
+      return;
+    }
+    if (!start || !end) {
+      setError("Please choose start and end dates.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = {
+        user_id: uid,
+        employee_name: displayName ?? null,
+        type: "Leave" as const,
+        start_date: start,
+        end_date: end,
+        notes: notes || null,
+        status: "pending" as const,
+      };
+      const { error } = await supabase.from("requests").insert(payload);
+      if (error) throw error;
+
+      setStart("");
+      setEnd("");
+      setNotes("");
+      setSuccess("Time off request submitted.");
+      await load(uid); // immediate refetch
+    } catch (e: any) {
+      setError(e.message ?? "Submit failed.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {/* Left: Request form */}
+    <div className="mx-auto max-w-5xl p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-semibold">Request Time Off</h1>
+        <Button variant="outline" onClick={refresh} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </Button>
+      </div>
+
+      {error && (
+        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          {success}
+        </div>
+      )}
+
+      {/* Submit form */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Request Time Off</CardTitle>
+          <CardTitle>New Time Off Request</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {notice && <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">{notice}</div>}
-          {error && <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-900">{error}</div>}
-
-          <div className="grid gap-2">
-            <label className="text-sm">Type</label>
-            {/* pass undefined to show placeholder when value is "" */}
-            <Select value={(type as string) || undefined} onValueChange={(v) => setType(v as TimeOffType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Vacation">Vacation</SelectItem>
-                <SelectItem value="Sick">Sick</SelectItem>
-                <SelectItem value="Personal">Personal</SelectItem>
-                <SelectItem value="Unpaid">Unpaid</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-1">
+            <label className="text-sm">Start date</label>
+            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
-
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="grid gap-2">
-              <label className="text-sm">Start date</label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm">End date</label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
+          <div className="grid gap-1">
+            <label className="text-sm">End date</label>
+            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
-
-          <div className="text-xs text-muted-foreground">
-            Days requested: {startDate && endDate ? dayCount(startDate, endDate) : 0}
+          <div className="md:col-span-2 grid gap-1">
+            <label className="text-sm">Notes (optional)</label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Reason, context, etc."
+            />
           </div>
-
-          <div className="grid gap-2">
-            <label className="text-sm">Reason (optional)</label>
-            <Textarea rows={3} placeholder="Add any details for your manager" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-
-          <Separator />
-
-          <div className="flex gap-2">
-            <Button className="bg-green-600 hover:bg-green-700" onClick={submit}>Submit</Button>
-            <Button variant="outline" onClick={clearForm}>Clear</Button>
+          <div className="md:col-span-2">
+            <Button onClick={submit} disabled={submitting}>
+              {submitting ? "Submitting…" : "Submit request"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Right: Submitted requests */}
+      {/* History */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">My Requests</CardTitle>
+          <CardTitle>My Time Off</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Submitted</TableHead>
                 <TableHead>Dates</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Notes</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+                <TableHead>Submitted</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((r) => (
-                <TableRow key={r.id} className="hover:bg-gray-50">
-                  <TableCell className="text-gray-600">{new Date(r.submittedAt).toLocaleString()}</TableCell>
-                  <TableCell>{fmt(r.startDate)} – {fmt(r.endDate)} ({dayCount(r.startDate, r.endDate)})</TableCell>
-                  <TableCell>{r.type}</TableCell>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
                   <TableCell>
-                    <Badge variant={r.status === "pending" ? "secondary" : r.status === "approved" ? "default" : "destructive"}>
-                      {r.status}
-                    </Badge>
+                    {r.start_date || r.end_date ? `${r.start_date ?? "—"} → ${r.end_date ?? "—"}` : "—"}
                   </TableCell>
-                  <TableCell>
-                    {r.status === "pending" && (
-                      <Button variant="outline" size="sm" onClick={() => cancel(r.id)}>
-                        Cancel
-                      </Button>
-                    )}
+                  <TableCell className="max-w-[380px] truncate">{r.notes ?? "—"}</TableCell>
+                  <TableCell className={
+                    r.status === "pending" ? "text-yellow-700" :
+                    r.status === "approved" ? "text-green-700" : "text-red-700"
+                  }>
+                    {r.status}
                   </TableCell>
+                  <TableCell>{fmtDate(r.created_at)}</TableCell>
                 </TableRow>
               ))}
-              {list.length === 0 && (
+              {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                    No time off requests yet.
+                  <TableCell colSpan={4} className="text-center text-sm text-gray-500">
+                    {loading ? "Loading…" : uid ? "No time off requests yet." : "Sign in to view requests."}
                   </TableCell>
                 </TableRow>
               )}
