@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { X, Play, Search, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,6 +117,7 @@ export default function TrainingModule() {
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [completedTopics, setCompletedTopics] = useState<Set<string>>(new Set());
+  const router = useRouter();
 
   const handleViewClick = (topic: TrainingTopic) => {
     setSelectedVideo({
@@ -179,7 +181,10 @@ export default function TrainingModule() {
                 />
               </div>
             </div>
-            <Button className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-md transition-colors duration-200 whitespace-nowrap">
+            <Button 
+              onClick={() => router.push("/training-qa")}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-md transition-colors duration-200 whitespace-nowrap"
+            >
               Create Questions
             </Button>
           </div>
