@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Play, Search } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -18,49 +19,49 @@ const TRAINING_TOPICS: TrainingTopic[] = [
     id: "onboarding",
     title: "Onboarding & Orientation Training",
     description: "Company overview, team introduction, tools/software walkthrough, and workplace tour.",
-    image: "/image1.png",
+    image: "/education.jpg",
     videoUrl: "https://www.youtube.com/embed/UUNp7rnJZOM",
   },
   {
     id: "firstaid",
     title: "First Aid Training",
     description: "Essential emergency preparedness and first aid procedures for workplace safety.",
-    image: "/image2.jpg",
+    image: "/healthcare.jpeg",
     videoUrl: "https://www.youtube.com/embed/GhBGMfLnY-k",
   },
   {
     id: "safety",
     title: "Safety Training",
     description: "Workplace hazards, equipment usage, PPE, and emergency procedures.",
-    image: "/image3.jpg",
+    image: "/construction.jpg",
     videoUrl: "https://www.youtube.com/embed/pbEsTl7yguw",
   },
   {
     id: "policy",
     title: "Company Policy Training",
     description: "Handbook overview, attendance, code of conduct, and privacy policy.",
-    image: "/image4.jpg",
+    image: "/finance.jpg",
     videoUrl: "https://www.youtube.com/embed/7OLWjz3TEXg",
   },
   {
     id: "itsecurity",
     title: "IT & Cybersecurity Training",
     description: "Password management, safe internet practices, phishing awareness, and data protection.",
-    image: "/image5.jpg",
+    image: "/technology.jpg",
     videoUrl: "https://www.youtube.com/embed/CT5gmh9cxpk",
   },
   {
     id: "communication",
     title: "Communication & Professional Skills Training",
     description: "Email etiquette, workplace communication, and customer service best practices.",
-    image: "/image6.jpg",
+    image: "/retail.jpeg",
     videoUrl: "https://www.youtube.com/embed/PiNN-HmHu7A",
   },
   {
     id: "payroll",
     title: "Financial or Payroll Training",
     description: "Timesheet submission, benefits overview, and pay cycle process.",
-    image: "/image7.jpeg",
+    image: "/finance.jpg",
     videoUrl: "https://www.youtube.com/embed/u7zHYgXZPjs?start=39",
   },
 ];
@@ -166,10 +167,12 @@ export default function TrainingModule() {
                 >
                   {/* Image Container */}
                   <div className="relative w-full h-40 bg-gray-200 overflow-hidden">
-                    <img
+                    <Image
                       src={topic.image}
                       alt={topic.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center">
                       <Play size={40} className="text-white opacity-0 hover:opacity-100 transition-opacity duration-300" />
