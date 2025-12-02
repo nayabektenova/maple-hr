@@ -1,5 +1,3 @@
-
-
 import TrainingQA from "@/components/training-module"
 
 export default function TrainingQAPage() {
