@@ -1,4 +1,4 @@
-import TrainingQA from "@/components/training-module"
+import TrainingQA from "@/components/question-answer";
 
 export default function TrainingQAPage() {
   return (
