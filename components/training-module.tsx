@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Play, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Play, Search, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -115,6 +116,8 @@ export default function TrainingModule() {
     videoUrl: string;
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [completedTopics, setCompletedTopics] = useState<Set<string>>(new Set());
+  const router = useRouter();
 
   const handleViewClick = (topic: TrainingTopic) => {
     setSelectedVideo({
@@ -123,9 +126,25 @@ export default function TrainingModule() {
     });
   };
 
+  const toggleComplete = (topicId: string) => {
+    setCompletedTopics((prev) => {
+      const updated = new Set(prev);
+      if (updated.has(topicId)) {
+        updated.delete(topicId);
+      } else {
+        updated.add(topicId);
+      }
+      return updated;
+    });
+  };
+
   const filtered = TRAINING_TOPICS.filter((topic) =>
     topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     topic.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const progressPercentage = Math.round(
+    (completedTopics.size / TRAINING_TOPICS.length) * 100
   );
 
   return (
@@ -138,7 +157,7 @@ export default function TrainingModule() {
           </div>
           
           {/* Search Bar */}
-          <div className="relative">
+          <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
               placeholder="Search training modules..."
@@ -146,6 +165,28 @@ export default function TrainingModule() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+
+          {/* Progress Bar and Create Questions */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Progress</label>
+                <span className="text-sm font-semibold text-gray-900">{progressPercentage}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-green-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+            </div>
+            <Button 
+              onClick={() => router.push("/training-qa")}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-md transition-colors duration-200 whitespace-nowrap"
+            >
+              Create Questions
+            </Button>
           </div>
         </div>
       </div>
@@ -185,13 +226,26 @@ export default function TrainingModule() {
                       {topic.description}
                     </p>
 
-                    {/* View Button - Styled like Create Announcement */}
+                    {/* View Button */}
                     <Button
                       onClick={() => handleViewClick(topic)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-md transition-colors duration-200"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-md transition-colors duration-200 mb-3"
                     >
                       View Training
                     </Button>
+
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => toggleComplete(topic.id)}
+                      className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md font-medium transition-all duration-200 ${
+                        completedTopics.has(topic.id)
+                          ? "bg-green-100 text-green-700 border border-green-300"
+                          : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
+                      }`}
+                    >
+                      <Check size={18} />
+                      {completedTopics.has(topic.id) ? "Completed" : "Mark Complete"}
+                    </button>
                   </div>
                 </div>
               ))}
