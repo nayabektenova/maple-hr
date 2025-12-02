@@ -1,4 +1,4 @@
-// app/employees/hierarchy/page.tsx
+
 
 import TrainingQA from "@/components/training-module"
 
