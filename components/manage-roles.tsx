@@ -1,4 +1,3 @@
-// components/manage-roles-enhanced.tsx
 "use client";
 
 import * as React from "react";
@@ -12,7 +11,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +21,6 @@ import {
   fetchEmployeesWithRoles,
   updateEmployeeRole,
   fetchAuditLogs,
-  searchEmployeesByRoleOrDept,
   type Role,
   type Permission,
   type EmployeeWithRole,
@@ -36,35 +33,29 @@ type ChangeSummary = {
   newRoleId: number;
 };
 
-export default function ManageRolesEnhanced() {
-  // Data states
+export default function ManageRoles() {
   const [roles, setRoles] = React.useState<Role[]>([]);
   const [employees, setEmployees] = React.useState<EmployeeWithRole[]>([]);
   const [auditLogs, setAuditLogs] = React.useState<RoleAuditLog[]>([]);
   const [permissions, setPermissions] = React.useState<Permission[]>([]);
 
-  // UI states
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
-  // Filter & search
   const [query, setQuery] = React.useState("");
   const [filterRole, setFilterRole] = React.useState<string>("");
   const [filterDept, setFilterDept] = React.useState<string>("");
 
-  // Selection
   const [selectedEmpId, setSelectedEmpId] = React.useState<string | null>(null);
   const [changes, setChanges] = React.useState<Map<string, ChangeSummary>>(
     new Map()
   );
 
-  // Tab state
   const [activeTab, setActiveTab] = React.useState<"manage" | "audit">(
     "manage"
   );
 
-  // Load initial data
   React.useEffect(() => {
     async function loadData() {
       try {
@@ -81,14 +72,12 @@ export default function ManageRolesEnhanced() {
         setEmployees(employeesData);
         setAuditLogs(auditData);
 
-        // Extract unique permissions from roles
         const allPerms = new Set<Permission>();
         rolesData.forEach((r) =>
           r.permissions?.forEach((p) => allPerms.add(p))
         );
         setPermissions(Array.from(allPerms));
 
-        // Set first employee as selected
         if (employeesData.length > 0) {
           setSelectedEmpId(employeesData[0].id);
         }
@@ -103,27 +92,8 @@ export default function ManageRolesEnhanced() {
     loadData();
   }, []);
 
-  // Filtered employees
-  const filtered = React.useMemo(async () => {
-    const dept = filterDept || undefined;
-    const roleId = filterRole ? parseInt(filterRole) : undefined;
+  const filtered = employees;
 
-    try {
-      if (query.trim() || roleId || dept) {
-        return await searchEmployeesByRoleOrDept(
-          query.trim().toLowerCase(),
-          roleId,
-          dept
-        );
-      }
-      return employees;
-    } catch (err) {
-      console.error("Search error:", err);
-      return employees;
-    }
-  }, [query, filterRole, filterDept, employees]);
-
-  // Selected employee & role
   const selectedEmp = React.useMemo(
     () => employees.find((e) => e.id === selectedEmpId) || null,
     [selectedEmpId, employees]
@@ -136,14 +106,12 @@ export default function ManageRolesEnhanced() {
     [selectedEmp, selectedEmpId, roles, changes]
   );
 
-  // Unique departments
   const departments = React.useMemo(
     () =>
       [...new Set(employees.map((e) => e.department))].filter(Boolean).sort(),
     [employees]
   );
 
-  // Handle role change
   const handleRoleChange = (newRoleId: number) => {
     if (!selectedEmp) return;
 
@@ -158,7 +126,6 @@ export default function ManageRolesEnhanced() {
     });
   };
 
-  // Save changes
   const handleSaveChanges = async () => {
     if (changes.size === 0) return;
 
@@ -171,12 +138,11 @@ export default function ManageRolesEnhanced() {
         await updateEmployeeRole(
           change.employeeId,
           change.newRoleId,
-          "current_user", // Replace with actual current user
+          "admin_user",
           "Role changed via admin panel"
         );
       }
 
-      // Refresh data
       const updatedEmployees = await fetchEmployeesWithRoles();
       const updatedAudit = await fetchAuditLogs(50);
 
@@ -185,7 +151,6 @@ export default function ManageRolesEnhanced() {
       setChanges(new Map());
       setSuccess(`Successfully updated ${changes.size} role(s)`);
 
-      // Refresh selected employee
       const updated = updatedEmployees.find((e) => e.id === selectedEmpId);
       if (updated) {
         setSelectedEmpId(updated.id);
@@ -198,7 +163,6 @@ export default function ManageRolesEnhanced() {
     }
   };
 
-  // Discard changes
   const handleDiscardChanges = () => {
     setChanges(new Map());
   };
@@ -220,7 +184,6 @@ export default function ManageRolesEnhanced() {
 
   return (
     <div className="space-y-6">
-      {/* Alert messages */}
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -237,7 +200,6 @@ export default function ManageRolesEnhanced() {
         </Alert>
       )}
 
-      {/* Tab navigation */}
       <div className="flex gap-2 border-b">
         <button
           onClick={() => setActiveTab("manage")}
@@ -261,16 +223,13 @@ export default function ManageRolesEnhanced() {
         </button>
       </div>
 
-      {/* Manage Access Tab */}
       {activeTab === "manage" && (
         <div className="grid gap-6 md:grid-cols-3">
-          {/* Left: Employee list */}
           <Card className="md:col-span-1">
             <CardHeader>
               <CardTitle className="text-base">Employees</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -283,7 +242,6 @@ export default function ManageRolesEnhanced() {
 
               <Separator />
 
-              {/* Filters */}
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-600 flex items-center gap-2">
                   <Filter className="h-3 w-3" /> Filters
@@ -320,60 +278,57 @@ export default function ManageRolesEnhanced() {
 
               <Separator />
 
-              {/* Employee list */}
               <ScrollArea className="h-[500px]">
                 <div className="space-y-2 pt-2">
-                  {Array.isArray(filtered) &&
-                    filtered.map((e) => {
-                      const active = selectedEmpId === e.id;
-                      const hasChange = changes.has(e.id);
-                      const change = changes.get(e.id);
-                      const currentRole = roles.find(
-                        (r) => r.id === (change?.newRoleId || e.role_id)
-                      );
+                  {filtered.map((e) => {
+                    const active = selectedEmpId === e.id;
+                    const hasChange = changes.has(e.id);
+                    const change = changes.get(e.id);
+                    const currentRole = roles.find(
+                      (r) => r.id === (change?.newRoleId || e.role_id)
+                    );
 
-                      return (
-                        <button
-                          key={e.id}
-                          onClick={() => setSelectedEmpId(e.id)}
-                          className={`w-full rounded-md border p-3 text-left transition ${
-                            active
-                              ? "ring-2 ring-green-500 bg-green-50 border-green-200"
-                              : "hover:bg-gray-50"
-                          } ${
-                            hasChange ? "bg-yellow-50 border-yellow-200" : ""
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div>
-                              <div className="font-medium text-sm">
-                                {e.first_name} {e.last_name}
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {e.position} • {e.department}
-                              </div>
+                    return (
+                      <button
+                        key={e.id}
+                        onClick={() => setSelectedEmpId(e.id)}
+                        className={`w-full rounded-md border p-3 text-left transition ${
+                          active
+                            ? "ring-2 ring-green-500 bg-green-50 border-green-200"
+                            : "hover:bg-gray-50"
+                        } ${
+                          hasChange ? "bg-yellow-50 border-yellow-200" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="font-medium text-sm">
+                              {e.first_name} {e.last_name}
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge variant="outline" className="text-xs">
-                                {currentRole?.name || "Unassigned"}
-                              </Badge>
-                              {hasChange && (
-                                <div
-                                  className="h-1.5 w-1.5 rounded-full bg-yellow-500"
-                                  title="Changed"
-                                />
-                              )}
+                            <div className="text-xs text-gray-600">
+                              {e.position} • {e.department}
                             </div>
                           </div>
-                        </button>
-                      );
-                    })}
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="outline" className="text-xs">
+                              {currentRole?.name || "Unassigned"}
+                            </Badge>
+                            {hasChange && (
+                              <div
+                                className="h-1.5 w-1.5 rounded-full bg-yellow-500"
+                                title="Changed"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </CardContent>
           </Card>
 
-          {/* Right: Role + permissions */}
           <Card className="md:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">
@@ -393,7 +348,6 @@ export default function ManageRolesEnhanced() {
                 </div>
               ) : (
                 <>
-                  {/* Employee info */}
                   <div className="rounded-md bg-gray-50 p-4 border border-gray-200">
                     <div className="font-semibold text-gray-900">
                       {selectedEmp.first_name} {selectedEmp.last_name}
@@ -410,10 +364,9 @@ export default function ManageRolesEnhanced() {
 
                   <Separator />
 
-                  {/* Role assignment */}
                   <div className="grid gap-2 md:w-96">
                     <label className="text-sm font-medium">Assigned role</label>
-                    {selectedEmp && selectedEmp.role_id ? (
+                    {selectedEmp.role_id ? (
                       <Select
                         value={(
                           changes.get(selectedEmpId!)?.newRoleId ||
@@ -425,27 +378,24 @@ export default function ManageRolesEnhanced() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {roles.map((r) => (
-                            <SelectItem key={r.id} value={r.id.toString()}>
-                              {r.name}
-                              {r.description && (
-                                <span className="text-xs ml-1">
-                                  ({r.description})
-                                </span>
-                              )}
-                            </SelectItem>
-                          ))}
+                          {roles.length > 0 ? (
+                            roles.map((r) => (
+                              <SelectItem key={r.id} value={r.id.toString()}>
+                                {r.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="0">No roles available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     ) : (
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
-                        Employee has no role assigned. Assign one from the list
-                        below.
+                        No role assigned yet
                       </div>
                     )}
                   </div>
 
-                  {/* Role description */}
                   {selectedRole && (
                     <div className="rounded-md bg-blue-50 p-3 border border-blue-200 text-sm">
                       <div className="font-medium text-blue-900">
@@ -456,7 +406,6 @@ export default function ManageRolesEnhanced() {
 
                   <Separator />
 
-                  {/* Permissions grid */}
                   {selectedRole &&
                   selectedRole.permissions &&
                   selectedRole.permissions.length > 0 ? (
@@ -464,13 +413,12 @@ export default function ManageRolesEnhanced() {
                       <div className="text-sm font-medium mb-3">
                         Permissions in this role
                       </div>
-                      <div className="space-y-2">
-                        {/* Group by category */}
+                      <div className="space-y-3">
                         {Array.from(
                           new Map(
                             selectedRole.permissions.map((p) => [p.category, p])
                           ).entries()
-                        ).map(([category, firstPerm]) => {
+                        ).map(([category]) => {
                           const catPerms = selectedRole.permissions!.filter(
                             (p) => p.category === category
                           );
@@ -505,7 +453,6 @@ export default function ManageRolesEnhanced() {
 
                   <Separator />
 
-                  {/* Action buttons */}
                   <div className="flex gap-2">
                     <Button
                       onClick={handleSaveChanges}
@@ -527,7 +474,6 @@ export default function ManageRolesEnhanced() {
         </div>
       )}
 
-      {/* Audit Log Tab */}
       {activeTab === "audit" && (
         <Card>
           <CardHeader>
