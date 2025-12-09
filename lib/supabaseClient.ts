@@ -81,17 +81,22 @@ export async function fetchEmployeesWithRoles(): Promise<EmployeeWithRole[]> {
       department,
       position,
       role_id,
-      manager_name,
-      roles:role_id(id, name, description, created_at, updated_at)
+      manager_name
     `)
     .order("last_name", { ascending: true });
 
   if (error) throw new Error(`Failed to fetch employees: ${error.message}`);
 
-  return (data || []).map((emp: any) => ({
-    ...emp,
-    role: Array.isArray(emp.roles) ? emp.roles[0] : emp.roles,
-  }));
+  // Fetch roles separately and map them
+  const rolesData = await fetchRolesWithPermissions();
+  
+  return (data || []).map((emp: any) => {
+    const role = rolesData.find((r) => r.id === emp.role_id);
+    return {
+      ...emp,
+      role: role || null,
+    };
+  });
 }
 
 export async function updateEmployeeRole(
