@@ -247,12 +247,17 @@ export default function ManageRoles() {
                   <Filter className="h-3 w-3" /> Filters
                 </label>
 
-                <Select value={filterRole} onValueChange={setFilterRole}>
+                <Select
+                  value={filterRole || "all-roles"}
+                  onValueChange={(v) =>
+                    setFilterRole(v === "all-roles" ? "" : v)
+                  }
+                >
                   <SelectTrigger className="text-sm">
                     <SelectValue placeholder="All roles" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All roles</SelectItem>
+                    <SelectItem value="all-roles">All roles</SelectItem>
                     {roles.map((r) => (
                       <SelectItem key={r.id} value={r.id.toString()}>
                         {r.name}
@@ -261,12 +266,17 @@ export default function ManageRoles() {
                   </SelectContent>
                 </Select>
 
-                <Select value={filterDept} onValueChange={setFilterDept}>
+                <Select
+                  value={filterDept || "all-depts"}
+                  onValueChange={(v) =>
+                    setFilterDept(v === "all-depts" ? "" : v)
+                  }
+                >
                   <SelectTrigger className="text-sm">
                     <SelectValue placeholder="All departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All departments</SelectItem>
+                    <SelectItem value="all-depts">All departments</SelectItem>
                     {departments.map((d) => (
                       <SelectItem key={d} value={d}>
                         {d}
@@ -296,9 +306,7 @@ export default function ManageRoles() {
                           active
                             ? "ring-2 ring-green-500 bg-green-50 border-green-200"
                             : "hover:bg-gray-50"
-                        } ${
-                          hasChange ? "bg-yellow-50 border-yellow-200" : ""
-                        }`}
+                        } ${hasChange ? "bg-yellow-50 border-yellow-200" : ""}`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div>
@@ -366,7 +374,7 @@ export default function ManageRoles() {
 
                   <div className="grid gap-2 md:w-96">
                     <label className="text-sm font-medium">Assigned role</label>
-                    {selectedEmp.role_id ? (
+                    {selectedEmp.role_id && roles.length > 0 ? (
                       <Select
                         value={(
                           changes.get(selectedEmpId!)?.newRoleId ||
@@ -375,23 +383,21 @@ export default function ManageRoles() {
                         onValueChange={(v) => handleRoleChange(parseInt(v))}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select a role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {roles.length > 0 ? (
-                            roles.map((r) => (
-                              <SelectItem key={r.id} value={r.id.toString()}>
-                                {r.name}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="0">No roles available</SelectItem>
-                          )}
+                          {roles.map((r) => (
+                            <SelectItem key={r.id} value={r.id.toString()}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ) : (
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
-                        No role assigned yet
+                        {roles.length === 0
+                          ? "No roles available in the system"
+                          : "This employee has no role assigned yet. Please assign a role."}
                       </div>
                     )}
                   </div>
