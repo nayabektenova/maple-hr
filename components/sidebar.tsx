@@ -33,6 +33,7 @@ const navigation = [
   { name: "Survey", href: "/survey", icon: MessageSquare },
   { name: "Survey Employee", href: "/survey-employee", icon: MessageSquare },
   { name: "Resume AI", href: "/resume-ai", icon: Sparkles },
+  { name: "Resume ATS", href: "/resume-ats", icon: Sparkles },
   { name: "Requests", href: "/requests", icon: ClipboardList },
   { name: "Requests Employee", href: "/requests-employee", icon: ClipboardList },
   { name: "Pay", href: "/employeeview/pay", icon: DollarSign },
