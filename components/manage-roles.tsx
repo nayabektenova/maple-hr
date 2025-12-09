@@ -5,7 +5,13 @@ import * as React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -49,10 +55,14 @@ export default function ManageRolesEnhanced() {
 
   // Selection
   const [selectedEmpId, setSelectedEmpId] = React.useState<string | null>(null);
-  const [changes, setChanges] = React.useState<Map<string, ChangeSummary>>(new Map());
+  const [changes, setChanges] = React.useState<Map<string, ChangeSummary>>(
+    new Map()
+  );
 
   // Tab state
-  const [activeTab, setActiveTab] = React.useState<"manage" | "audit">("manage");
+  const [activeTab, setActiveTab] = React.useState<"manage" | "audit">(
+    "manage"
+  );
 
   // Load initial data
   React.useEffect(() => {
@@ -73,7 +83,9 @@ export default function ManageRolesEnhanced() {
 
         // Extract unique permissions from roles
         const allPerms = new Set<Permission>();
-        rolesData.forEach((r) => r.permissions?.forEach((p) => allPerms.add(p)));
+        rolesData.forEach((r) =>
+          r.permissions?.forEach((p) => allPerms.add(p))
+        );
         setPermissions(Array.from(allPerms));
 
         // Set first employee as selected
@@ -98,7 +110,11 @@ export default function ManageRolesEnhanced() {
 
     try {
       if (query.trim() || roleId || dept) {
-        return await searchEmployeesByRoleOrDept(query.trim().toLowerCase(), roleId, dept);
+        return await searchEmployeesByRoleOrDept(
+          query.trim().toLowerCase(),
+          roleId,
+          dept
+        );
       }
       return employees;
     } catch (err) {
@@ -114,13 +130,16 @@ export default function ManageRolesEnhanced() {
   );
 
   const selectedRole = React.useMemo(
-    () => selectedEmp?.role || roles.find((r) => r.id === changes.get(selectedEmpId!)?.newRoleId),
+    () =>
+      selectedEmp?.role ||
+      roles.find((r) => r.id === changes.get(selectedEmpId!)?.newRoleId),
     [selectedEmp, selectedEmpId, roles, changes]
   );
 
   // Unique departments
   const departments = React.useMemo(
-    () => [...new Set(employees.map((e) => e.department))].filter(Boolean).sort(),
+    () =>
+      [...new Set(employees.map((e) => e.department))].filter(Boolean).sort(),
     [employees]
   );
 
@@ -190,7 +209,9 @@ export default function ManageRolesEnhanced() {
         <CardContent className="p-8">
           <div className="text-center space-y-2">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-green-600" />
-            <p className="text-sm text-gray-500">Loading roles and permissions...</p>
+            <p className="text-sm text-gray-500">
+              Loading roles and permissions...
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -210,7 +231,9 @@ export default function ManageRolesEnhanced() {
       {success && (
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">{success}</AlertDescription>
+          <AlertDescription className="text-green-800">
+            {success}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -317,7 +340,9 @@ export default function ManageRolesEnhanced() {
                             active
                               ? "ring-2 ring-green-500 bg-green-50 border-green-200"
                               : "hover:bg-gray-50"
-                          } ${hasChange ? "bg-yellow-50 border-yellow-200" : ""}`}
+                          } ${
+                            hasChange ? "bg-yellow-50 border-yellow-200" : ""
+                          }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div>
@@ -333,7 +358,10 @@ export default function ManageRolesEnhanced() {
                                 {currentRole?.name || "Unassigned"}
                               </Badge>
                               {hasChange && (
-                                <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Changed" />
+                                <div
+                                  className="h-1.5 w-1.5 rounded-full bg-yellow-500"
+                                  title="Changed"
+                                />
                               )}
                             </div>
                           </div>
@@ -348,7 +376,9 @@ export default function ManageRolesEnhanced() {
           {/* Right: Role + permissions */}
           <Card className="md:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Manage Roles & Permissions</CardTitle>
+              <CardTitle className="text-base">
+                Manage Roles & Permissions
+              </CardTitle>
               {changes.size > 0 && (
                 <Badge variant="destructive" className="text-xs">
                   {changes.size} pending
@@ -358,7 +388,9 @@ export default function ManageRolesEnhanced() {
 
             <CardContent className="space-y-4">
               {!selectedEmp ? (
-                <div className="text-sm text-gray-500">Select an employee to manage access.</div>
+                <div className="text-sm text-gray-500">
+                  Select an employee to manage access.
+                </div>
               ) : (
                 <>
                   {/* Employee info */}
@@ -370,7 +402,9 @@ export default function ManageRolesEnhanced() {
                       {selectedEmp.position} • {selectedEmp.department}
                     </div>
                     {selectedEmp.email && (
-                      <div className="text-xs text-gray-500 mt-2">{selectedEmp.email}</div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        {selectedEmp.email}
+                      </div>
                     )}
                   </div>
 
@@ -379,37 +413,57 @@ export default function ManageRolesEnhanced() {
                   {/* Role assignment */}
                   <div className="grid gap-2 md:w-96">
                     <label className="text-sm font-medium">Assigned role</label>
-                    <Select
-                      value={(changes.get(selectedEmpId!)?.newRoleId || selectedEmp.role_id || "").toString()}
-                      onValueChange={(v) => handleRoleChange(parseInt(v))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map((r) => (
-                          <SelectItem key={r.id} value={r.id.toString()}>
-                            {r.name}
-                            {r.description && <span className="text-xs ml-1">({r.description})</span>}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {selectedEmp && selectedEmp.role_id ? (
+                      <Select
+                        value={(
+                          changes.get(selectedEmpId!)?.newRoleId ||
+                          selectedEmp.role_id
+                        ).toString()}
+                        onValueChange={(v) => handleRoleChange(parseInt(v))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((r) => (
+                            <SelectItem key={r.id} value={r.id.toString()}>
+                              {r.name}
+                              {r.description && (
+                                <span className="text-xs ml-1">
+                                  ({r.description})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
+                        Employee has no role assigned. Assign one from the list
+                        below.
+                      </div>
+                    )}
                   </div>
 
                   {/* Role description */}
                   {selectedRole && (
                     <div className="rounded-md bg-blue-50 p-3 border border-blue-200 text-sm">
-                      <div className="font-medium text-blue-900">{selectedRole.description}</div>
+                      <div className="font-medium text-blue-900">
+                        {selectedRole.description}
+                      </div>
                     </div>
                   )}
 
                   <Separator />
 
                   {/* Permissions grid */}
-                  {selectedRole && selectedRole.permissions && selectedRole.permissions.length > 0 ? (
+                  {selectedRole &&
+                  selectedRole.permissions &&
+                  selectedRole.permissions.length > 0 ? (
                     <div>
-                      <div className="text-sm font-medium mb-3">Permissions in this role</div>
+                      <div className="text-sm font-medium mb-3">
+                        Permissions in this role
+                      </div>
                       <div className="space-y-2">
                         {/* Group by category */}
                         {Array.from(
@@ -432,7 +486,9 @@ export default function ManageRolesEnhanced() {
                                     className="flex items-center gap-2 rounded-md border bg-green-50 border-green-200 p-2"
                                   >
                                     <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
-                                    <span className="text-sm text-gray-700">{p.label}</span>
+                                    <span className="text-sm text-gray-700">
+                                      {p.label}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
@@ -442,7 +498,9 @@ export default function ManageRolesEnhanced() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm text-gray-500">No permissions assigned to this role.</div>
+                    <div className="text-sm text-gray-500">
+                      No permissions assigned to this role.
+                    </div>
                   )}
 
                   <Separator />
@@ -499,14 +557,22 @@ export default function ManageRolesEnhanced() {
                     </tr>
                   ) : (
                     auditLogs.map((log) => {
-                      const oldRole = roles.find((r) => r.id === log.old_role_id);
-                      const newRole = roles.find((r) => r.id === log.new_role_id);
-                      const emp = employees.find((e) => e.id === log.employee_id);
+                      const oldRole = roles.find(
+                        (r) => r.id === log.old_role_id
+                      );
+                      const newRole = roles.find(
+                        (r) => r.id === log.new_role_id
+                      );
+                      const emp = employees.find(
+                        (e) => e.id === log.employee_id
+                      );
 
                       return (
                         <tr key={log.id} className="border-b hover:bg-gray-50">
                           <td className="p-3">
-                            {emp ? `${emp.first_name} ${emp.last_name}` : "Unknown"}
+                            {emp
+                              ? `${emp.first_name} ${emp.last_name}`
+                              : "Unknown"}
                           </td>
                           <td className="p-3">
                             {oldRole ? (
@@ -522,7 +588,9 @@ export default function ManageRolesEnhanced() {
                           <td className="p-3 text-xs text-gray-600">
                             {new Date(log.changed_at).toLocaleDateString()}
                           </td>
-                          <td className="p-3 text-xs text-gray-600">{log.reason || "—"}</td>
+                          <td className="p-3 text-xs text-gray-600">
+                            {log.reason || "—"}
+                          </td>
                         </tr>
                       );
                     })
