@@ -42,7 +42,7 @@ const navigation = [
   { name: "Analytics", href: "/attrition-analytics", icon: Sparkles },
   { name: "News Feed", href: "/employeeview/news", icon: Newspaper },
   { name: "News Admin", href: "/admin/news", icon: Megaphone },
-  { name: "Chatbot", href: "/chatbot", icon: Megaphone }
+  //{ name: "Chatbot", href: "/chatbot", icon: Megaphone }
 
 
 ]
