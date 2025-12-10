@@ -13,7 +13,7 @@ type JobPosition = {
   employment_type: string;
   published_at: string;
 };
-
+//  position id :number 
 export default function ResumeAtsPage() {
   const [positions, setPositions] = useState<JobPosition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,12 +43,12 @@ export default function ResumeAtsPage() {
 
   const handleDeletePosition = async (positionId: number) => {
     if (!confirm("Delete this position and all candidates?")) return;
-
+    // delete position from the supabase database
     try {
       const { error: deleteError } = await supabase
         .from("job_positions")
         .delete()
-        .eq("position_id", positionId);
+        .eq("position_id", positionId); // position id: number 
 
       if (deleteError) throw new Error(deleteError.message);
 
@@ -101,7 +101,7 @@ export default function ResumeAtsPage() {
               href="/resume-ats/post-job"
               className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-medium"
             >
-              Create Your First Position
+              Create Your Company First Position
             </Link>
           </div>
         ) : (
